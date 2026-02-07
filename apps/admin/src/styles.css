@@ -504,6 +504,36 @@ a {
   overflow: hidden;
 }
 
+.datatable-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  background: #fcfcfd;
+}
+
+.datatable-head__info {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.datatable-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.datatable-page-size .ui-select {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -524,6 +554,24 @@ a {
   font-size: 12px;
   letter-spacing: 0.3px;
   text-transform: uppercase;
+}
+
+.datatable-sort {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.datatable-sort:hover {
+  color: var(--army-700);
 }
 
 .table-title-cell {
@@ -559,6 +607,21 @@ a {
 
 .file-link {
   font-size: 13px;
+}
+
+.datatable-footer {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.datatable-footer__actions {
+  display: inline-flex;
+  gap: 8px;
 }
 
 .content-toolbar {
@@ -767,6 +830,10 @@ a {
 
   .content-toolbar {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .datatable-head {
+    flex-wrap: wrap;
   }
 }
 

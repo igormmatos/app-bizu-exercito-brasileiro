@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CatalogItem, Category, ItemType } from "@bizu/shared";
 import {
@@ -35,6 +35,9 @@ const EMPTY_FORM: ItemFormState = {
   existingStoragePath: null,
 };
 
+type SortKey = "title" | "category" | "type" | "published" | "updated_at";
+type SortDirection = "asc" | "desc";
+
 export function ItemManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -47,6 +50,10 @@ export function ItemManager() {
   const [filterPublished, setFilterPublished] = useState<ItemPublishedFilter>("all");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("updated_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category.name])), [categories]);
   const visibleItems = useMemo(() => {
@@ -57,6 +64,17 @@ export function ItemManager() {
       return haystack.includes(q);
     });
   }, [items, search]);
+  const sortedItems = useMemo(() => {
+    const data = [...visibleItems];
+    data.sort((a, b) => compareItems(a, b, sortKey, sortDirection, categoriesById));
+    return data;
+  }, [visibleItems, sortKey, sortDirection, categoriesById]);
+  const totalPages = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedItems.slice(start, start + pageSize);
+  }, [sortedItems, currentPage, pageSize]);
 
   useEffect(() => {
     void loadCategories();
@@ -65,6 +83,10 @@ export function ItemManager() {
   useEffect(() => {
     void loadItems();
   }, [filterCategory, filterPublished]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterCategory, filterPublished, pageSize]);
 
   async function loadCategories() {
     try {
@@ -180,12 +202,22 @@ export function ItemManager() {
     setSelectedFile(null);
   }
 
+  function handleSort(nextKey: SortKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(nextKey);
+    setSortDirection(nextKey === "updated_at" ? "desc" : "asc");
+  }
+
   return (
     <section className="section">
       <header className="page-header">
         <div>
           <h1>Gerenciar Conteudo</h1>
-          <p className="text-muted">{visibleItems.length} itens listados</p>
+          <p className="text-muted">{sortedItems.length} itens listados</p>
         </div>
         <Button startIcon={<Plus size={15} />} onClick={openNew}>
           Novo Item
@@ -232,28 +264,66 @@ export function ItemManager() {
       {error ? <div className="error-box">{error}</div> : null}
       {loading ? <p className="text-muted">Carregando itens...</p> : null}
 
-      {!loading && visibleItems.length === 0 ? (
+      {!loading && sortedItems.length === 0 ? (
         <Card>
           <p className="text-muted">Nenhum item encontrado para os filtros atuais.</p>
         </Card>
       ) : null}
 
-      {!loading && visibleItems.length > 0 ? (
+      {!loading && sortedItems.length > 0 ? (
         <Card className="table-card">
+          <div className="datatable-head">
+            <div className="datatable-head__info">
+              Mostrando {paginatedItems.length} de {sortedItems.length} itens
+            </div>
+            <label className="datatable-page-size">
+              <span>Linhas por pagina</span>
+              <select
+                value={String(pageSize)}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                className="ui-select"
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </label>
+          </div>
+
           <table className="table">
             <thead>
               <tr>
-                <th>Titulo</th>
-                <th>Categoria</th>
-                <th>Tipo</th>
+                <th>
+                  <button type="button" className="datatable-sort" onClick={() => handleSort("title")}>
+                    Titulo <ArrowUpDown size={13} />
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="datatable-sort" onClick={() => handleSort("category")}>
+                    Categoria <ArrowUpDown size={13} />
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="datatable-sort" onClick={() => handleSort("type")}>
+                    Tipo <ArrowUpDown size={13} />
+                  </button>
+                </th>
                 <th>Versao</th>
-                <th>Status</th>
-                <th>Atualizado</th>
+                <th>
+                  <button type="button" className="datatable-sort" onClick={() => handleSort("published")}>
+                    Status <ArrowUpDown size={13} />
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="datatable-sort" onClick={() => handleSort("updated_at")}>
+                    Atualizado <ArrowUpDown size={13} />
+                  </button>
+                </th>
                 <th>Acoes</th>
               </tr>
             </thead>
             <tbody>
-              {visibleItems.map((item) => (
+              {paginatedItems.map((item) => (
                 <tr key={item.id}>
                   <td>
                     <div className="table-title-cell">
@@ -295,6 +365,32 @@ export function ItemManager() {
               ))}
             </tbody>
           </table>
+
+          <div className="datatable-footer">
+            <span className="text-muted">
+              Pagina {currentPage} de {totalPages}
+            </span>
+            <div className="datatable-footer__actions">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
+                startIcon={<ChevronLeft size={14} />}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                startIcon={<ChevronRight size={14} />}
+              >
+                Proxima
+              </Button>
+            </div>
+          </div>
         </Card>
       ) : null}
 
@@ -434,6 +530,38 @@ function getAcceptForType(type: ItemType): string {
   if (type === "audio") return "audio/*";
   if (type === "image") return "image/*";
   return "*/*";
+}
+
+function compareItems(
+  a: CatalogItem,
+  b: CatalogItem,
+  key: SortKey,
+  direction: SortDirection,
+  categoriesById: Map<string, string>,
+): number {
+  const factor = direction === "asc" ? 1 : -1;
+
+  if (key === "title") {
+    return factor * a.title.localeCompare(b.title, "pt-BR");
+  }
+
+  if (key === "category") {
+    const categoryA = categoriesById.get(a.category_id) ?? a.category_id;
+    const categoryB = categoriesById.get(b.category_id) ?? b.category_id;
+    return factor * categoryA.localeCompare(categoryB, "pt-BR");
+  }
+
+  if (key === "type") {
+    return factor * a.type.localeCompare(b.type, "pt-BR");
+  }
+
+  if (key === "published") {
+    const statusA = a.published ? 1 : 0;
+    const statusB = b.published ? 1 : 0;
+    return factor * (statusA - statusB);
+  }
+
+  return factor * a.updated_at.localeCompare(b.updated_at, "pt-BR");
 }
 
 function getMessage(error: unknown): string {
