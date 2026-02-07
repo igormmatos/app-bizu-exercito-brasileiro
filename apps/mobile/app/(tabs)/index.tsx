@@ -1,35 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
-import { colors, getContentColor, type ContentType } from "@/src/theme/tokens";
+import { colors, type ContentType } from "@/src/theme/tokens";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const {
-    categories,
-    items,
-    downloadedMap,
-    loadingCache,
-    loadingBizu,
-    bizuOfTheDay,
-    favoriteIds,
-    isFavorite,
-    toggleFavorite,
-  } = useCatalog();
-  const categoriesById = useMemo(
-    () => new Map(categories.map((category) => [category.id, category.name])),
-    [categories],
-  );
+  const { categories, items, loadingCache, loadingBizu, bizuOfTheDay, downloadedMap, isFavorite, toggleFavorite } =
+    useCatalog();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const categoryStats = useMemo(() => {
+    const stats = new Map<string, { total: number; offline: number }>();
+    for (const category of categories) {
+      stats.set(category.id, { total: 0, offline: 0 });
+    }
+
+    for (const item of items) {
+      const current = stats.get(item.category_id);
+      if (!current) continue;
+      current.total += 1;
+      if (item.type !== "text" && downloadedMap[item.id]) {
+        current.offline += 1;
+      }
+    }
+
+    return stats;
+  }, [categories, downloadedMap, items]);
+
   const recentItems = useMemo(
     () =>
       items
         .slice()
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-        .slice(0, 10),
+        .slice(0, 6),
     [items],
   );
+
+  function openSearch() {
+    const q = searchQuery.trim();
+    router.push({
+      pathname: "/search",
+      params: q ? { q } : undefined,
+    });
+  }
 
   async function handleToggleFavorite(id: string) {
     try {
@@ -40,27 +56,72 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bizu EB - Home</Text>
-      <Text style={styles.subtitle}>Categorias em cache</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        onSubmitEditing={openSearch}
+        onFocus={openSearch}
+        placeholder="Buscar bizu, cancao..."
+        returnKeyType="search"
+      />
 
-      {loadingCache ? <Text>Carregando cache local...</Text> : null}
-      {loadingBizu ? <Text>Carregando Bizu do Dia...</Text> : null}
+      <Text style={styles.sectionTitle}>Categorias</Text>
+      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
-      {!loadingCache && !loadingBizu && bizuOfTheDay ? (
-        <View
-          style={[
-            styles.bizuCard,
-            {
-              borderColor: getContentColor(bizuOfTheDay.type as ContentType).primary,
-              backgroundColor: getContentColor(bizuOfTheDay.type as ContentType).bg,
-            },
-          ]}
-        >
+      {!loadingCache && categories.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>Sem categorias no cache. Use "Sincronizar agora" na rota Admin.</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.grid}>
+        {!loadingCache
+          ? categories.map((category) => {
+              const stat = categoryStats.get(category.id) ?? { total: 0, offline: 0 };
+              return (
+                <Pressable
+                  key={category.id}
+                  style={styles.gridItem}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/category/[id]",
+                      params: { id: category.id },
+                    })
+                  }
+                >
+                  {({ pressed }) => (
+                    <View style={[styles.categoryCard, pressed ? styles.categoryCardPressed : null]}>
+                      <View style={styles.categoryIconCircle}>
+                        <Ionicons name="book-outline" size={18} color={colors.army600} />
+                      </View>
+                      <Text style={styles.categoryTitle} numberOfLines={2}>
+                        {category.name}
+                      </Text>
+                      <Text style={styles.categoryCount}>{stat.total} itens</Text>
+                      {stat.offline > 0 ? (
+                        <PillBadge
+                          label={`${stat.offline} offline`}
+                          tone="success"
+                          style={styles.categoryOfflineBadge}
+                        />
+                      ) : null}
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })
+          : null}
+      </View>
+
+      {!loadingBizu && bizuOfTheDay ? (
+        <View style={styles.bizuCard}>
           <Text style={styles.bizuLabel}>Bizu do Dia</Text>
-          <Text style={styles.bizuTitle}>{bizuOfTheDay.title}</Text>
-          <Text style={styles.bizuMeta}>
-            {categoriesById.get(bizuOfTheDay.category_id) ?? "Sem categoria"} • {bizuOfTheDay.type}
+          <Text style={styles.bizuTitle} numberOfLines={2}>
+            {bizuOfTheDay.title}
+          </Text>
+          <Text style={styles.bizuMeta} numberOfLines={2}>
+            {bizuOfTheDay.description ?? "Bizu em destaque para consulta rapida."}
           </Text>
           <Pressable
             style={styles.bizuButton}
@@ -71,208 +132,152 @@ export default function HomeScreen() {
               })
             }
           >
-            <Ionicons name={iconByType(bizuOfTheDay.type)} size={14} color={colors.white} />
-            <Text style={styles.bizuButtonText}>Abrir</Text>
+            <Text style={styles.bizuButtonText}>Ler agora</Text>
           </Pressable>
         </View>
       ) : null}
 
-      {!loadingCache && categories.length === 0 ? (
-        <Text style={styles.empty}>Sem categorias no cache. Use "Sincronizar agora" na rota Admin.</Text>
-      ) : null}
-
-      {!loadingCache
-        ? categories.map((category) => (
-            <Pressable
-              key={category.id}
-              style={styles.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/category/[id]",
-                  params: { id: category.id },
-                })
-              }
-            >
-              <Text style={styles.cardTitle}>{category.name}</Text>
-              <Text style={styles.cardMeta}>
-                Abrir itens da categoria • Offline: {countOfflineByCategory(category.id, items, downloadedMap)} •
-                Favoritos: {countFavoritesByCategory(category.id, items, favoriteIds)}
-              </Text>
-            </Pressable>
-          ))
-        : null}
-
-      {!loadingCache && recentItems.length > 0 ? (
-        <Text style={styles.sectionTitle}>Acesso rapido</Text>
-      ) : null}
-
+      {!loadingCache && recentItems.length > 0 ? <Text style={styles.sectionTitle}>Acesso rapido</Text> : null}
       {!loadingCache
         ? recentItems.map((item) => (
-            <View key={item.id} style={styles.itemCard}>
-              <Pressable
-                style={styles.itemMain}
-                onPress={() =>
-                  router.push({
-                    pathname: "/item/[id]",
-                    params: { id: item.id },
-                  })
-                }
-              >
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.itemMeta}>{item.type}</Text>
-              </Pressable>
-              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite(item.id)}>
-                <Ionicons
-                  name={isFavorite(item.id) ? "star" : "star-outline"}
-                  size={18}
-                  color={isFavorite(item.id) ? colors.army600 : colors.gray500}
-                />
-              </Pressable>
-            </View>
+            <ContentListItem
+              key={item.id}
+              type={item.type as ContentType}
+              title={item.title}
+              subtitle={item.description ?? item.type}
+              onPress={() =>
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: item.id },
+                })
+              }
+              trailing={
+                <Pressable onPress={() => void handleToggleFavorite(item.id)} hitSlop={8}>
+                  <Ionicons
+                    name={isFavorite(item.id) ? "star" : "star-outline"}
+                    size={18}
+                    color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                  />
+                </Pressable>
+              }
+            />
           ))
         : null}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 16,
     gap: 12,
     backgroundColor: colors.gray100,
   },
-  title: {
-    fontSize: 24,
+  sectionTitle: {
+    marginTop: 6,
+    fontSize: 17,
     fontWeight: "700",
     color: colors.gray900,
   },
-  subtitle: {
+  metaText: {
     fontSize: 14,
     color: colors.gray700,
-    marginBottom: 4,
   },
-  card: {
+  emptyCard: {
     borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 10,
-    padding: 12,
+    borderColor: colors.gray300,
+    borderRadius: 12,
     backgroundColor: colors.white,
+    padding: 12,
   },
-  cardTitle: {
-    fontSize: 18,
+  emptyText: {
+    color: colors.gray700,
+    fontSize: 14,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 12,
+  },
+  gridItem: {
+    width: "48%",
+  },
+  categoryCard: {
+    minHeight: 114,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    backgroundColor: colors.white,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  categoryCardPressed: {
+    transform: [{ scale: 0.985 }],
+  },
+  categoryIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: colors.army100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryTitle: {
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "600",
     color: colors.gray900,
   },
-  cardMeta: {
-    marginTop: 4,
+  categoryCount: {
+    fontSize: 12,
     color: colors.gray500,
   },
-  empty: {
-    fontSize: 14,
-    color: colors.gray700,
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: 10,
+  categoryOfflineBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    minHeight: 18,
   },
   bizuCard: {
-    borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
-    gap: 6,
+    backgroundColor: colors.army800,
+    padding: 14,
+    gap: 8,
   },
   bizuLabel: {
     fontSize: 12,
-    color: colors.gray700,
+    color: "#D1FAE5",
     fontWeight: "700",
   },
   bizuTitle: {
-    fontSize: 18,
-    color: colors.gray900,
+    fontSize: 19,
+    lineHeight: 24,
+    color: colors.white,
     fontWeight: "700",
   },
   bizuMeta: {
     fontSize: 13,
-    color: colors.gray700,
+    color: "#E5E7EB",
   },
   bizuButton: {
-    marginTop: 4,
-    backgroundColor: colors.army600,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    marginTop: 2,
     alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   bizuButtonText: {
-    color: colors.white,
-    fontWeight: "700",
-  },
-  sectionTitle: {
-    marginTop: 6,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.gray900,
-  },
-  itemCard: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  itemMain: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.gray900,
-  },
-  itemMeta: {
-    marginTop: 4,
+    color: colors.army900,
     fontSize: 13,
-    color: colors.gray500,
-  },
-  favoriteButton: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 999,
-    width: 34,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.white,
+    fontWeight: "700",
   },
 });
-
-function countOfflineByCategory(
-  categoryId: string,
-  items: ReturnType<typeof useCatalog>["items"],
-  downloadedMap: ReturnType<typeof useCatalog>["downloadedMap"],
-): number {
-  return items.filter((item) => item.category_id === categoryId && item.type !== "text" && downloadedMap[item.id])
-    .length;
-}
-
-function countFavoritesByCategory(
-  categoryId: string,
-  items: ReturnType<typeof useCatalog>["items"],
-  favoriteIds: string[],
-): number {
-  const favorites = new Set(favoriteIds);
-  return items.filter((item) => item.category_id === categoryId && favorites.has(item.id)).length;
-}
-
-function iconByType(type: string): keyof typeof Ionicons.glyphMap {
-  if (type === "audio") return "musical-notes";
-  if (type === "pdf") return "document-text";
-  if (type === "image") return "image";
-  return "text";
-}

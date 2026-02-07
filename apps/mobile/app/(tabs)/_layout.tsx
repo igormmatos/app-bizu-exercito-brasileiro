@@ -1,24 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { PillBadge } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
 
 export default function TabLayout() {
   const router = useRouter();
   const { message, syncing } = useCatalog();
-  const [query, setQuery] = useState("");
 
   const offlineDetected = !syncing && Boolean(message?.toLowerCase().includes("falha"));
-
-  function openSearch() {
-    const q = query.trim();
-    router.push({
-      pathname: "/search",
-      params: q ? { q } : undefined,
-    });
-  }
 
   function openAdmin() {
     router.push("/admin");
@@ -26,7 +17,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
+      screenOptions={({ route }) => ({
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: colors.army600,
         tabBarInactiveTintColor: colors.gray500,
@@ -34,30 +25,13 @@ export default function TabLayout() {
         tabBarItemStyle: styles.tabBarItem,
         header: () => (
           <View style={styles.headerContainer}>
-            <View style={styles.headerTop}>
-              <Pressable onLongPress={openAdmin} delayLongPress={500}>
-                <Text style={styles.headerTitle}>Bizus EB</Text>
-              </Pressable>
-              {offlineDetected ? <Text style={styles.offlineBadge}>Offline</Text> : null}
-            </View>
-            <View style={styles.searchRow}>
-              <TextInput
-                placeholder="Buscar no catalogo..."
-                placeholderTextColor={colors.gray500}
-                value={query}
-                onChangeText={setQuery}
-                onFocus={openSearch}
-                onSubmitEditing={openSearch}
-                style={styles.searchInput}
-                returnKeyType="search"
-              />
-              <Pressable onPress={openSearch} style={styles.searchButton}>
-                <Ionicons name="search" size={16} color={colors.white} />
-              </Pressable>
-            </View>
+            <Pressable onLongPress={openAdmin} delayLongPress={500}>
+              <Text style={styles.headerTitle}>{titleByRoute(route.name)}</Text>
+            </Pressable>
+            {offlineDetected ? <PillBadge label="Offline" tone="offline" /> : null}
           </View>
         ),
-      }}
+      })}
     >
       <Tabs.Screen
         name="index"
@@ -104,51 +78,21 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: colors.army900,
     paddingTop: 12,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  headerTop: {
+    paddingBottom: 12,
+    paddingHorizontal: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerTitle: {
     color: colors.white,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
   },
-  offlineBadge: {
-    color: colors.white,
-    backgroundColor: colors.gray500,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  searchRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: colors.white,
-    color: colors.gray900,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-  searchButton: {
-    backgroundColor: colors.army600,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });
+
+function titleByRoute(routeName: string): string {
+  if (routeName === "favorites") return "Meus Favoritos";
+  if (routeName === "suggestion") return "Colaboracao";
+  return "Bizus EB";
+}

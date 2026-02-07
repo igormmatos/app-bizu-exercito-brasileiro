@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useCatalog } from "@/src/state/catalogContext";
+import { Card, ContentListItem, OutlineButton, PillBadge, PrimaryButton, SearchBar } from "@/src/components/ui";
 import {
   createBatchController,
   downloadCategory,
@@ -11,31 +11,43 @@ import {
   removeCategoryDownloads,
   type BatchProgress,
 } from "@/src/lib/batchDownload";
-import { colors } from "@/src/theme/tokens";
+import { useCatalog } from "@/src/state/catalogContext";
+import { type ContentType, colors } from "@/src/theme/tokens";
 
 export default function CategoryItemsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { categories, items, downloadedMap, loadingCache, reloadDownloads, isFavorite, toggleFavorite } = useCatalog();
+  const [query, setQuery] = useState("");
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [batchStatus, setBatchStatus] = useState<"idle" | "downloading" | "removing" | "cancelled" | "error">("idle");
   const [batchMessage, setBatchMessage] = useState<string | null>(null);
   const batchControllerRef = useRef<ReturnType<typeof createBatchController> | null>(null);
 
   const category = categories.find((entry) => entry.id === id);
-  const categoryItems = useMemo(
-    () => items.filter((item) => item.category_id === id),
-    [items, id],
-  );
+  const categoryItems = useMemo(() => items.filter((item) => item.category_id === id), [items, id]);
+  const filteredItems = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return categoryItems;
+    }
+
+    return categoryItems.filter((item) => {
+      const haystack = `${item.title} ${item.description ?? ""} ${(item.tags ?? []).join(" ")}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [categoryItems, query]);
   const categoryMediaItems = useMemo(() => getCategoryMediaItems(categoryItems), [categoryItems]);
   const categoryDownloadedCount = useMemo(
     () => categoryMediaItems.filter((item) => Boolean(downloadedMap[item.id])).length,
     [categoryMediaItems, downloadedMap],
   );
+
   const running = batchStatus === "downloading" || batchStatus === "removing";
-  const progressCount = running && batchProgress?.currentItemTitle
-    ? Math.min(batchProgress.completed + 1, batchProgress.total)
-    : (batchProgress?.completed ?? 0);
+  const progressCount =
+    running && batchProgress?.currentItemTitle
+      ? Math.min(batchProgress.completed + 1, batchProgress.total)
+      : (batchProgress?.completed ?? 0);
 
   useEffect(() => () => batchControllerRef.current?.cancel(), []);
 
@@ -64,9 +76,7 @@ export default function CategoryItemsScreen() {
 
       if (result.failCount > 0) {
         setBatchStatus("error");
-        setBatchMessage(
-          `Download finalizado com erros: ${result.okCount} ok, ${result.failCount} falha(s).`,
-        );
+        setBatchMessage(`Download finalizado com erros: ${result.okCount} ok, ${result.failCount} falha(s).`);
         return;
       }
 
@@ -123,14 +133,12 @@ export default function CategoryItemsScreen() {
   }
 
   function handleCancelBatch() {
-    if (batchControllerRef.current) {
-      batchControllerRef.current.cancel();
-    }
+    batchControllerRef.current?.cancel();
   }
 
-  async function handleToggleFavorite(id: string) {
+  async function handleToggleFavorite(itemId: string) {
     try {
-      await toggleFavorite(id);
+      await toggleFavorite(itemId);
     } catch {
       // message handled in context
     }
@@ -138,96 +146,107 @@ export default function CategoryItemsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{category?.name ?? "Categoria"}</Text>
-      <Text style={styles.subtitle}>Itens publicados em cache</Text>
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        placeholder={`Buscar em ${category?.name ?? "Categoria"}...`}
+      />
 
-      {loadingCache ? <Text>Carregando cache local...</Text> : null}
-
+      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
       {!loadingCache && !category ? (
-        <Text style={styles.empty}>Categoria nao encontrada no cache.</Text>
-      ) : null}
-
-      {!loadingCache && category && categoryItems.length === 0 ? (
-        <Text style={styles.empty}>Nenhum item desta categoria no cache.</Text>
+        <Card>
+          <Text style={styles.emptyText}>Categoria nao encontrada no cache.</Text>
+        </Card>
       ) : null}
 
       {!loadingCache && category ? (
-        <View style={styles.batchCard}>
+        <Card style={styles.batchCard}>
           <Text style={styles.batchTitle}>Acoes da categoria</Text>
-          <Text style={styles.batchInfo}>
+          <Text style={styles.metaText}>
             Elegiveis para download: {categoryMediaItems.length} | Ja baixados: {categoryDownloadedCount}
           </Text>
 
           <View style={styles.actionsRow}>
-            <Pressable
-              style={[styles.button, (!categoryMediaItems.length || running) && styles.buttonDisabled]}
-              onPress={handleDownloadCategory}
+            <PrimaryButton
+              label="Baixar categoria"
+              onPress={() => void handleDownloadCategory()}
               disabled={!categoryMediaItems.length || running}
-            >
-              <Text style={styles.buttonText}>Baixar categoria</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, (!categoryDownloadedCount || running) && styles.buttonDisabled]}
-              onPress={handleRemoveCategoryDownloads}
+              style={styles.actionButton}
+            />
+            <OutlineButton
+              label="Remover downloads"
+              onPress={() => void handleRemoveCategoryDownloads()}
               disabled={!categoryDownloadedCount || running}
-            >
-              <Text style={styles.secondaryButtonText}>Remover downloads da categoria</Text>
-            </Pressable>
+              style={styles.actionButton}
+            />
             {running ? (
-              <Pressable style={styles.secondaryButton} onPress={handleCancelBatch}>
-                <Text style={styles.secondaryButtonText}>Cancelar</Text>
-              </Pressable>
+              <OutlineButton
+                label="Cancelar"
+                onPress={handleCancelBatch}
+                compact
+                style={styles.cancelButton}
+              />
             ) : null}
           </View>
 
           {batchProgress ? (
             <>
-              <Text style={styles.batchInfo}>
+              <Text style={styles.metaText}>
                 {batchProgress.mode === "download" ? "Baixando" : "Removendo"} {progressCount}/{batchProgress.total}
               </Text>
               {batchProgress.currentItemTitle ? (
-                <Text style={styles.batchInfo}>
-                  Item atual: {truncate(batchProgress.currentItemTitle, 48)}
-                </Text>
+                <Text style={styles.metaText}>Item atual: {truncate(batchProgress.currentItemTitle, 48)}</Text>
               ) : null}
             </>
           ) : null}
 
-          {batchStatus !== "idle" ? (
-            <Text style={styles.batchInfo}>Estado: {statusLabel(batchStatus)}</Text>
+          {batchStatus !== "idle" ? <Text style={styles.metaText}>Estado: {statusLabel(batchStatus)}</Text> : null}
+          {batchMessage ? (
+            <View style={styles.batchMessageBox}>
+              <Text style={styles.batchMessage}>{batchMessage}</Text>
+            </View>
           ) : null}
-          {batchMessage ? <Text style={styles.batchMessage}>{batchMessage}</Text> : null}
-        </View>
+        </Card>
+      ) : null}
+
+      {!loadingCache && category && filteredItems.length === 0 ? (
+        <Card>
+          <Text style={styles.emptyText}>Nenhum item encontrado com esse filtro.</Text>
+        </Card>
       ) : null}
 
       {!loadingCache && category
-        ? categoryItems.map((item) => (
-            <View key={item.id} style={styles.card}>
-              <Pressable
-                style={styles.cardMain}
-                onPress={() =>
-                  router.push({
-                    pathname: "/item/[id]",
-                    params: { id: item.id },
-                  })
-                }
-              >
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardMeta}>
-                  {item.type} • {item.published ? "publicado" : "rascunho"}
-                </Text>
-                {item.type !== "text" && downloadedMap[item.id] ? (
-                  <Text style={styles.offline}>Offline</Text>
-                ) : null}
-              </Pressable>
-              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite(item.id)}>
-                <Ionicons
-                  name={isFavorite(item.id) ? "star" : "star-outline"}
-                  size={18}
-                  color={isFavorite(item.id) ? colors.army600 : colors.gray500}
-                />
-              </Pressable>
-            </View>
+        ? filteredItems.map((item) => (
+            <ContentListItem
+              key={item.id}
+              type={item.type as ContentType}
+              title={item.title}
+              subtitle={item.description ?? item.type}
+              onPress={() =>
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: item.id },
+                })
+              }
+              trailing={
+                <View style={styles.trailingWrap}>
+                  {item.type !== "text" && downloadedMap[item.id] ? (
+                    <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
+                  ) : null}
+                  <Pressable
+                    style={styles.favoriteIconButton}
+                    onPress={() => void handleToggleFavorite(item.id)}
+                    hitSlop={8}
+                  >
+                    <Ionicons
+                      name={isFavorite(item.id) ? "star" : "star-outline"}
+                      size={18}
+                      color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                    />
+                  </Pressable>
+                </View>
+              }
+            />
           ))
         : null}
     </ScrollView>
@@ -236,118 +255,62 @@ export default function CategoryItemsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 16,
     gap: 12,
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#555",
-  },
-  empty: {
-    fontSize: 14,
-    color: "#666",
-    backgroundColor: "#f3f3f3",
-    borderRadius: 8,
-    padding: 10,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: "#f8f8f8",
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-  cardMain: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  cardMeta: {
-    marginTop: 4,
-    color: "#666",
-  },
-  offline: {
-    marginTop: 6,
-    color: "#0a7f33",
-    fontWeight: "600",
+    backgroundColor: colors.gray100,
   },
   batchCard: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: "#f8f8f8",
     gap: 8,
   },
   batchTitle: {
     fontSize: 16,
     fontWeight: "700",
+    color: colors.gray900,
   },
-  batchInfo: {
+  metaText: {
     fontSize: 13,
-    color: "#555",
+    color: colors.gray700,
   },
-  batchMessage: {
+  emptyText: {
     fontSize: 14,
-    color: "#333",
-    backgroundColor: "#efefef",
-    borderRadius: 8,
-    padding: 8,
+    color: colors.gray700,
   },
   actionsRow: {
     flexDirection: "row",
     gap: 8,
     flexWrap: "wrap",
   },
-  button: {
-    marginTop: 2,
-    backgroundColor: "#1f6feb",
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
+  actionButton: {
+    flexGrow: 1,
   },
-  secondaryButton: {
-    marginTop: 2,
+  cancelButton: {
+    minWidth: 100,
+  },
+  batchMessageBox: {
+    backgroundColor: colors.gray100,
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
-    borderColor: "#1f6feb",
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
-    backgroundColor: "#fff",
+    borderColor: colors.gray300,
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  batchMessage: {
+    fontSize: 13,
+    color: colors.gray700,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
+  trailingWrap: {
+    gap: 6,
+    alignItems: "center",
   },
-  secondaryButtonText: {
-    color: "#1f6feb",
-    fontWeight: "600",
+  offlineBadge: {
+    minHeight: 18,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
-  favoriteButton: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 999,
-    width: 34,
-    height: 34,
+  favoriteIconButton: {
+    minWidth: 28,
+    minHeight: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.white,
   },
 });
 

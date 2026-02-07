@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { useCatalog } from "@/src/state/catalogContext";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Card, ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { normalize, searchCatalogIndex } from "@/src/lib/searchIndex";
-import { colors } from "@/src/theme/tokens";
+import { useCatalog } from "@/src/state/catalogContext";
+import { type ContentType, colors } from "@/src/theme/tokens";
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -28,122 +29,77 @@ export default function SearchScreen() {
     try {
       await toggleFavorite(id);
     } catch {
-      // message handled by context
+      // message handled in context
     }
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Busca</Text>
-      <Text style={styles.subtitle}>Resultados locais com ranking de relevancia.</Text>
-
-      <TextInput
-        placeholder="Digite para buscar..."
-        placeholderTextColor={colors.gray500}
+      <SearchBar
         value={query}
         onChangeText={setQuery}
-        style={styles.input}
+        placeholder="Buscar bizu, cancao..."
+        returnKeyType="search"
+        autoFocus={typeof q === "string" && q.length > 0}
       />
 
-      {loadingCache ? <Text>Carregando cache local...</Text> : null}
+      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
       {!loadingCache && items.length === 0 ? (
-        <Text style={styles.empty}>Sem itens no cache. Execute a sincronizacao na rota Admin.</Text>
+        <Card>
+          <Text style={styles.emptyText}>Sem itens no cache. Execute a sincronizacao na rota Admin.</Text>
+        </Card>
       ) : null}
 
       {!loadingCache && items.length > 0 ? (
         <Text style={styles.resultCount}>
           {rankedResults.length} resultado(s)
-          {normalizedQuery ? ` para "${query}"` : " (top 50 em ordem alfabetica)"}
+          {normalizedQuery ? ` para "${query}"` : " (top 50)"}
         </Text>
       ) : null}
 
       {!loadingCache && items.length > 0 && rankedResults.length === 0 ? (
-        <Text style={styles.empty}>Nenhum resultado para "{query}".</Text>
+        <Card>
+          <Text style={styles.emptyText}>Nenhum resultado para "{query}".</Text>
+        </Card>
       ) : null}
 
       {!loadingCache
-        ? rankedResults.map(({ item, score }) => (
-            <View key={item.id} style={styles.card}>
-              <Pressable
-                style={styles.cardMain}
-                onPress={() =>
-                  router.push({
-                    pathname: "/item/[id]",
-                    params: { id: item.id },
-                  })
-                }
-              >
-                <Text style={styles.cardTitle}>{renderHighlightedTitle(item.title, normalizedQuery)}</Text>
-                <Text style={styles.cardMeta}>
-                  {item.type}
-                  {normalizedQuery ? ` • score ${score}` : ""}
-                </Text>
-                {item.type !== "text" && downloadedMap[item.id] ? (
-                  <Text style={styles.offline}>Offline</Text>
-                ) : null}
-              </Pressable>
-              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite(item.id)}>
-                <Ionicons
-                  name={isFavorite(item.id) ? "star" : "star-outline"}
-                  size={18}
-                  color={isFavorite(item.id) ? colors.army600 : colors.gray500}
-                />
-              </Pressable>
-            </View>
+        ? rankedResults.map(({ item }) => (
+            <ContentListItem
+              key={item.id}
+              type={item.type as ContentType}
+              title={item.title}
+              subtitle={item.description ?? item.type}
+              onPress={() =>
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: item.id },
+                })
+              }
+              trailing={
+                <View style={styles.trailingWrap}>
+                  {item.type !== "text" && downloadedMap[item.id] ? (
+                    <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
+                  ) : null}
+                  <Pressable
+                    style={styles.favoriteIconButton}
+                    onPress={() => void handleToggleFavorite(item.id)}
+                    hitSlop={8}
+                  >
+                    <Ionicons
+                      name={isFavorite(item.id) ? "star" : "star-outline"}
+                      size={18}
+                      color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                    />
+                  </Pressable>
+                </View>
+              }
+            />
           ))
         : null}
     </View>
   );
-}
-
-function renderHighlightedTitle(title: string, normalizedQuery: string): ReactNode {
-  if (!normalizedQuery) {
-    return title;
-  }
-
-  const match = findNormalizedMatch(title, normalizedQuery);
-  if (!match) {
-    return title;
-  }
-
-  return (
-    <Text>
-      {title.slice(0, match.start)}
-      <Text style={styles.highlight}>{title.slice(match.start, match.end)}</Text>
-      {title.slice(match.end)}
-    </Text>
-  );
-}
-
-function findNormalizedMatch(text: string, normalizedNeedle: string): { start: number; end: number } | null {
-  if (!text || !normalizedNeedle) {
-    return null;
-  }
-
-  let normalized = "";
-  const normalizedToOriginal: number[] = [];
-
-  for (let i = 0; i < text.length; i += 1) {
-    const normalizedChar = normalize(text[i]).replace(/\s+/g, "");
-    if (!normalizedChar) {
-      continue;
-    }
-    normalized += normalizedChar;
-    for (let j = 0; j < normalizedChar.length; j += 1) {
-      normalizedToOriginal.push(i);
-    }
-  }
-
-  const index = normalized.indexOf(normalizedNeedle);
-  if (index < 0) {
-    return null;
-  }
-
-  const start = normalizedToOriginal[index] ?? 0;
-  const endIndex = normalizedToOriginal[index + normalizedNeedle.length - 1];
-  const end = typeof endIndex === "number" ? endIndex + 1 : start + 1;
-  return { start, end };
 }
 
 const styles = StyleSheet.create({
@@ -153,75 +109,32 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.gray100,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.gray900,
-  },
-  subtitle: {
+  metaText: {
     fontSize: 14,
     color: colors.gray700,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: colors.white,
-    color: colors.gray900,
   },
   resultCount: {
     fontSize: 13,
     color: colors.gray700,
+    fontWeight: "600",
   },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: colors.white,
-    flexDirection: "row",
-    gap: 10,
+  trailingWrap: {
+    gap: 6,
     alignItems: "center",
   },
-  cardMain: {
-    flex: 1,
+  offlineBadge: {
+    minHeight: 18,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.gray900,
-  },
-  cardMeta: {
-    marginTop: 4,
-    color: colors.gray500,
-  },
-  offline: {
-    marginTop: 6,
-    color: colors.gray700,
-    fontWeight: "600",
-  },
-  highlight: {
-    backgroundColor: "#fff1b8",
-    color: colors.gray900,
-    fontWeight: "700",
-  },
-  favoriteButton: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 999,
-    width: 34,
-    height: 34,
+  favoriteIconButton: {
+    minWidth: 28,
+    minHeight: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.white,
   },
-  empty: {
+  emptyText: {
     fontSize: 14,
     color: colors.gray700,
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    padding: 10,
   },
 });

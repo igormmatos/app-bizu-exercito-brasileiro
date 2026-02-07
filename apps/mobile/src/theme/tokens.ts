@@ -1,7 +1,12 @@
 export const colors = {
   army900: "#26392D",
+  army800: "#2F4A3A",
+  army700: "#355C45",
   army600: "#40694D",
+  army500: "#4F7C5E",
+  army100: "#E6EFE9",
   gray100: "#F3F4F6",
+  gray300: "#D1D5DB",
   gray900: "#111827",
   gray700: "#374151",
   gray500: "#6B7280",
@@ -18,7 +23,7 @@ export const colors = {
 
 export type ContentType = "audio" | "pdf" | "image" | "text";
 
-export function getContentColor(type: ContentType): { primary: string; bg: string } {
+export function getContentColors(type: ContentType): { primary: string; bg: string } {
   if (type === "audio") {
     return { primary: colors.audioPrimary, bg: colors.audioBg };
   }
@@ -29,4 +34,8 @@ export function getContentColor(type: ContentType): { primary: string; bg: strin
     return { primary: colors.imagePrimary, bg: colors.imageBg };
   }
   return { primary: colors.textPrimary, bg: colors.textBg };
+}
+
+export function getContentColor(type: ContentType): { primary: string; bg: string } {
+  return getContentColors(type);
 }

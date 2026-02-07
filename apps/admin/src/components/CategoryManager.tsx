@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Category } from "@bizu/shared";
-import { deleteCategory, fetchCategories, saveCategory } from "../lib/catalogApi";
+import { deleteCategory, fetchCategories, fetchItems, saveCategory } from "../lib/catalogApi";
+import { Badge, Button, Card, Input, Modal } from "./ui";
 
 const EMPTY_FORM = {
   id: "",
@@ -11,10 +12,20 @@ const EMPTY_FORM = {
 
 export function CategoryManager() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [itemsByCategory, setItemsByCategory] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const totalItems = useMemo(() => {
+    let count = 0;
+    for (const value of itemsByCategory.values()) {
+      count += value;
+    }
+    return count;
+  }, [itemsByCategory]);
 
   useEffect(() => {
     void load();
@@ -25,8 +36,21 @@ export function CategoryManager() {
     setError(null);
 
     try {
-      const data = await fetchCategories();
-      setCategories(data);
+      const [categoriesData, itemsData] = await Promise.all([
+        fetchCategories(),
+        fetchItems({ categoryId: "all", published: "all" }),
+      ]);
+
+      const counter = new Map<string, number>();
+      for (const category of categoriesData) {
+        counter.set(category.id, 0);
+      }
+      for (const item of itemsData) {
+        counter.set(item.category_id, (counter.get(item.category_id) ?? 0) + 1);
+      }
+
+      setCategories(categoriesData);
+      setItemsByCategory(counter);
     } catch (loadError) {
       setError(getMessage(loadError));
     } finally {
@@ -53,12 +77,18 @@ export function CategoryManager() {
         published: form.published,
       });
       await load();
-      setForm(EMPTY_FORM);
+      resetForm();
+      setModalOpen(false);
     } catch (saveError) {
       setError(getMessage(saveError));
     } finally {
       setSaving(false);
     }
+  }
+
+  function openNew() {
+    resetForm();
+    setModalOpen(true);
   }
 
   function startEdit(category: Category) {
@@ -68,6 +98,7 @@ export function CategoryManager() {
       sortOrder: category.sort_order,
       published: category.published,
     });
+    setModalOpen(true);
   }
 
   async function handleDelete(category: Category) {
@@ -78,118 +109,154 @@ export function CategoryManager() {
     try {
       await deleteCategory(category.id);
       await load();
-      if (form.id === category.id) {
-        setForm(EMPTY_FORM);
-      }
     } catch (deleteError) {
       setError(getMessage(deleteError));
     }
   }
 
+  async function handleTogglePublished(category: Category) {
+    setError(null);
+    try {
+      await saveCategory({
+        id: category.id,
+        name: category.name,
+        sortOrder: category.sort_order,
+        published: !category.published,
+      });
+      await load();
+    } catch (toggleError) {
+      setError(getMessage(toggleError));
+    }
+  }
+
+  function resetForm() {
+    setForm(EMPTY_FORM);
+  }
+
   return (
     <section className="section">
-      <header className="section-header">
-        <h2>Categorias</h2>
-        <button onClick={() => void load()} disabled={loading}>
-          Atualizar
-        </button>
+      <header className="page-header">
+        <div>
+          <h1>Categorias</h1>
+          <p className="text-muted">
+            {categories.length} categorias cadastradas • {totalItems} itens vinculados
+          </p>
+        </div>
+        <div className="toolbar-actions">
+          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+            Atualizar
+          </Button>
+          <Button onClick={openNew}>+ Nova Categoria</Button>
+        </div>
       </header>
 
-      <form className="panel form-grid" onSubmit={handleSubmit}>
-        <h3>{form.id ? "Editar categoria" : "Nova categoria"}</h3>
+      {error ? <div className="error-box">{error}</div> : null}
+      {loading ? <p className="text-muted">Carregando categorias...</p> : null}
 
-        <label>
-          Nome
-          <input
+      {!loading && categories.length === 0 ? (
+        <Card>
+          <p className="text-muted">Nenhuma categoria cadastrada.</p>
+        </Card>
+      ) : null}
+
+      <div className="category-grid">
+        {categories.map((category) => (
+          <Card
+            key={category.id}
+            className={["category-card", !category.published ? "category-card--draft" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="category-card__head">
+              <h3>{category.name}</h3>
+              <Badge variant={category.published ? "success" : "warning"}>
+                {category.published ? "Publicado" : "Rascunho"}
+              </Badge>
+            </div>
+
+            {!category.published ? (
+              <div className="draft-note">Rascunho (Invisivel no App)</div>
+            ) : null}
+
+            <p className="text-muted">Ordem de exibicao: {category.sort_order}</p>
+            <p className="text-muted">Itens vinculados: {itemsByCategory.get(category.id) ?? 0}</p>
+            <p className="text-muted">Atualizado em: {formatDate(category.updated_at)}</p>
+
+            <div className="category-card__actions">
+              <Button variant="outline" size="sm" onClick={() => startEdit(category)}>
+                Editar
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => void handleTogglePublished(category)}>
+                {category.published ? "Despublicar" : "Publicar"}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => void handleDelete(category)}>
+                Excluir
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Modal
+        open={modalOpen}
+        title={form.id ? "Editar Categoria" : "Nova Categoria"}
+        onClose={() => {
+          setModalOpen(false);
+          resetForm();
+        }}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setModalOpen(false);
+                resetForm();
+              }}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" form="category-form" disabled={saving}>
+              {saving ? "Salvando..." : form.id ? "Salvar Categoria" : "Criar Categoria"}
+            </Button>
+          </>
+        }
+      >
+        <form id="category-form" className="form-grid" onSubmit={handleSubmit}>
+          <Input
+            label="Nome"
             value={form.name}
             onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
             required
           />
-        </label>
 
-        <label>
-          Ordem
-          <input
+          <Input
+            label="Ordem"
             type="number"
-            value={form.sortOrder}
+            value={String(form.sortOrder)}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, sortOrder: Number(event.target.value || 0) }))
             }
           />
-        </label>
 
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.published}
-            onChange={(event) => setForm((prev) => ({ ...prev, published: event.target.checked }))}
-          />
-          Publicada
-        </label>
-
-        <div className="actions">
-          <button type="submit" disabled={saving}>
-            {saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar categoria"}
-          </button>
-          {form.id ? (
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => setForm(EMPTY_FORM)}
-              disabled={saving}
-            >
-              Cancelar edicao
-            </button>
-          ) : null}
-        </div>
-      </form>
-
-      {error ? <div className="error-box">{error}</div> : null}
-
-      <div className="panel">
-        <h3>Lista ({categories.length})</h3>
-        {loading ? <p>Carregando categorias...</p> : null}
-        {!loading && categories.length === 0 ? <p>Nenhuma categoria cadastrada.</p> : null}
-
-        {!loading && categories.length > 0 ? (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Ordem</th>
-                <th>Status</th>
-                <th>Atualizado em</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td>{category.name}</td>
-                  <td>{category.sort_order}</td>
-                  <td>{category.published ? "Publicado" : "Rascunho"}</td>
-                  <td>{formatDate(category.updated_at)}</td>
-                  <td className="actions">
-                    <button type="button" onClick={() => startEdit(category)}>
-                      Editar
-                    </button>
-                    <button type="button" className="danger" onClick={() => void handleDelete(category)}>
-                      Excluir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </div>
+          <label className="checkbox-row span-2">
+            <input
+              type="checkbox"
+              checked={form.published}
+              onChange={(event) => setForm((prev) => ({ ...prev, published: event.target.checked }))}
+            />
+            Publicada
+          </label>
+        </form>
+      </Modal>
     </section>
   );
 }
 
 function formatDate(value: string): string {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString("pt-BR");
 }
 
 function getMessage(error: unknown): string {

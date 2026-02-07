@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { Button, Card, Input } from "./ui";
 
 type LoginFormProps = {
   onSuccess: () => void;
@@ -33,37 +34,35 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   return (
     <div className="auth-shell">
-      <form className="panel login-panel" onSubmit={handleSubmit}>
-        <h1>Bizu EB Admin</h1>
-        <p>Entre com email e senha do Supabase Auth.</p>
+      <form className="login-panel" onSubmit={handleSubmit}>
+        <Card className="login-card">
+          <h1>Bizu EB Admin</h1>
+          <p>Entre com email e senha do Supabase Auth.</p>
 
-        <label>
-          Email
-          <input
+          <Input
+            label="Email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
             required
           />
-        </label>
 
-        <label>
-          Senha
-          <input
+          <Input
+            label="Senha"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
             required
           />
-        </label>
 
-        {error ? <div className="error-box">{error}</div> : null}
+          {error ? <div className="error-box">{error}</div> : null}
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Entrando..." : "Entrar"}
-        </button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Entrando..." : "Entrar"}
+          </Button>
+        </Card>
       </form>
     </div>
   );

@@ -1,6 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Card, PrimaryButton } from "@/src/components/ui";
 import { submitSuggestion } from "@/src/lib/suggestionsApi";
 import { colors } from "@/src/theme/tokens";
 
@@ -83,11 +85,14 @@ export default function SuggestionScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sugestao</Text>
-      <Text style={styles.subtitle}>Envie sugestoes para melhorar conteudo e experiencia.</Text>
+      <Card style={styles.formCard}>
+        <View style={styles.iconCircle}>
+          <Ionicons name="chatbox-outline" size={18} color={colors.army600} />
+        </View>
+        <Text style={styles.title}>Enviar Sugestao</Text>
+        <Text style={styles.subtitle}>Encontrou um erro ou tem uma ideia de bizu? Envie para nos.</Text>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Categoria (opcional)</Text>
+        <Text style={styles.label}>Categoria</Text>
         <View style={styles.categoryList}>
           {CATEGORY_OPTIONS.map((option) => (
             <Pressable
@@ -107,7 +112,7 @@ export default function SuggestionScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Email (opcional)</Text>
+        <Text style={styles.label}>Seu email (opcional)</Text>
         <TextInput
           value={contact}
           onChangeText={handleChangeContact}
@@ -120,40 +125,47 @@ export default function SuggestionScreen() {
           maxLength={200}
         />
 
-        <Text style={styles.label}>Mensagem</Text>
+        <Text style={styles.label}>Sua sugestao</Text>
         <TextInput
           value={message}
           onChangeText={handleChangeMessage}
-          placeholder="Digite sua sugestao"
+          placeholder="Descreva sua sugestao, correcao ou novo bizu..."
           placeholderTextColor={colors.gray500}
-          style={[styles.input, styles.textarea]}
+          style={styles.textarea}
           multiline
           textAlignVertical="top"
           maxLength={MESSAGE_MAX}
         />
+
         <Text style={styles.counter}>
           {messageLength}/{MESSAGE_MAX}
         </Text>
 
-        <Pressable
-          style={[styles.button, !isMessageValid || isSubmitting ? styles.buttonDisabled : null]}
+        <PrimaryButton
+          label={isSubmitting ? "Enviando..." : "Enviar Colaboracao"}
           onPress={() => void handleSubmit()}
           disabled={!isMessageValid || isSubmitting}
-        >
-          <Text style={styles.buttonText}>{isSubmitting ? "Enviando..." : "Enviar"}</Text>
-        </Pressable>
-      </View>
+        />
+
+        <Text style={styles.footnote}>Sua sugestao sera revisada pela administracao antes de ser publicada.</Text>
+      </Card>
 
       {submitState === "sent" ? (
-        <View style={styles.success}>
-          <Text style={styles.successText}>Sugestao enviada com sucesso.</Text>
-        </View>
+        <Card style={styles.feedbackCard}>
+          <View style={styles.feedbackRow}>
+            <Ionicons name="checkmark-circle" size={18} color={colors.army600} />
+            <Text style={styles.feedbackText}>Sugestao enviada com sucesso.</Text>
+          </View>
+        </Card>
       ) : null}
 
       {submitState === "error" ? (
-        <View style={styles.error}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-        </View>
+        <Card style={styles.feedbackCard}>
+          <View style={styles.feedbackRow}>
+            <Ionicons name="alert-circle" size={18} color={colors.pdfPrimary} />
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        </Card>
       ) : null}
     </View>
   );
@@ -166,27 +178,36 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.gray100,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.gray900,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.gray700,
-  },
-  form: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    padding: 12,
+  formCard: {
     gap: 10,
   },
-  label: {
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.army100,
+  },
+  title: {
+    fontSize: 23,
+    fontWeight: "700",
+    color: colors.gray900,
+    textAlign: "center",
+  },
+  subtitle: {
     fontSize: 13,
-    color: colors.gray700,
-    fontWeight: "600",
+    color: colors.gray500,
+    textAlign: "center",
+    marginBottom: 2,
+  },
+  label: {
+    fontSize: 11,
+    color: colors.gray500,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   categoryList: {
     flexDirection: "row",
@@ -195,7 +216,7 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     borderWidth: 1,
-    borderColor: colors.gray100,
+    borderColor: colors.gray300,
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -207,61 +228,55 @@ const styles = StyleSheet.create({
   },
   categoryButtonText: {
     color: colors.gray700,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
   },
   categoryButtonTextSelected: {
     color: colors.white,
   },
   input: {
-    backgroundColor: colors.white,
+    minHeight: 44,
+    backgroundColor: colors.gray100,
     borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 8,
+    borderColor: colors.gray300,
+    borderRadius: 10,
     color: colors.gray900,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   textarea: {
-    minHeight: 90,
-    textAlignVertical: "top",
+    minHeight: 108,
+    backgroundColor: colors.gray100,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 10,
+    color: colors.gray900,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   counter: {
     textAlign: "right",
     fontSize: 12,
     color: colors.gray500,
+    marginTop: -4,
   },
-  button: {
-    backgroundColor: colors.army600,
-    borderRadius: 8,
+  footnote: {
+    textAlign: "center",
+    fontSize: 11,
+    color: colors.gray500,
+    marginTop: 2,
+  },
+  feedbackCard: {
     paddingVertical: 10,
+  },
+  feedbackRow: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
-  buttonDisabled: {
-    backgroundColor: colors.gray500,
-  },
-  buttonText: {
-    color: colors.white,
-    fontWeight: "700",
-  },
-  success: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    padding: 12,
-  },
-  successText: {
+  feedbackText: {
     color: colors.gray700,
     fontSize: 14,
     fontWeight: "600",
-  },
-  error: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.pdfPrimary,
-    padding: 12,
   },
   errorText: {
     color: colors.pdfPrimary,

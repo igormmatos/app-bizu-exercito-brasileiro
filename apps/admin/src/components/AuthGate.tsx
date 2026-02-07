@@ -55,7 +55,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (loading) {
     return (
       <div className="auth-shell">
-        <div className="panel">Carregando sessao...</div>
+        <div className="ui-card">Carregando sessao...</div>
       </div>
     );
   }

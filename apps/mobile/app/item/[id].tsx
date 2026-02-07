@@ -1,20 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
-import {
-  Image,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useCatalog } from "@/src/state/catalogContext";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
 import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "@/src/lib/downloadManager";
+import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
 
 export default function ItemDetailScreen() {
@@ -25,6 +18,7 @@ export default function ItemDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [offlineSizeLabel, setOfflineSizeLabel] = useState("-- MB");
 
   const downloadedEntry = item ? downloadedMap[item.id] : undefined;
   const isDownloaded = Boolean(downloadedEntry);
@@ -33,6 +27,45 @@ export default function ItemDetailScreen() {
   const audioSource = item?.type === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
   const audioPlayer = useAudioPlayer(audioSource ?? null);
   const audioStatus = useAudioPlayerStatus(audioPlayer);
+
+  const audioDuration = Math.max(0, audioStatus.duration ?? 0);
+  const audioCurrentTime = Math.max(0, Math.min(audioStatus.currentTime ?? 0, audioDuration || 0));
+  const audioProgress = audioDuration > 0 ? audioCurrentTime / audioDuration : 0;
+  const lyricsText = useMemo(() => {
+    if (!item || item.type !== "audio") {
+      return "";
+    }
+    const audioTextBody = (item as { text_body?: string | null }).text_body;
+    return audioTextBody?.trim() || item.description?.trim() || "Sem letra cadastrada para este audio.";
+  }, [item]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function resolveSize() {
+      if (!downloadedEntry?.localUri) {
+        if (active) setOfflineSizeLabel("-- MB");
+        return;
+      }
+
+      try {
+        const info = await FileSystem.getInfoAsync(downloadedEntry.localUri);
+        const bytes = "size" in info && typeof info.size === "number" ? info.size : 0;
+        const mb = bytes / (1024 * 1024);
+        if (active) {
+          setOfflineSizeLabel(`${mb.toFixed(1)} MB`);
+        }
+      } catch {
+        if (active) setOfflineSizeLabel("-- MB");
+      }
+    }
+
+    void resolveSize();
+
+    return () => {
+      active = false;
+    };
+  }, [downloadedEntry?.localUri]);
 
   async function handleDownload() {
     if (!item || item.type === "text" || !item.storage_path) {
@@ -173,237 +206,264 @@ export default function ItemDetailScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Item Detail</Text>
-      <Text style={styles.subtitle}>Detalhes do item em cache e controle offline.</Text>
+      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
-      {item ? (
-        <Pressable style={styles.favoriteButton} onPress={handleToggleFavorite}>
-          <Ionicons
-            name={isFavorite(item.id) ? "star" : "star-outline"}
-            size={16}
-            color={isFavorite(item.id) ? colors.army600 : colors.gray700}
-          />
-          <Text style={styles.favoriteButtonText}>
-            {isFavorite(item.id) ? "Desfavoritar" : "Favoritar"}
-          </Text>
-        </Pressable>
+      {!loadingCache && !item ? (
+        <Card>
+          <Text style={styles.metaText}>Item nao encontrado no cache.</Text>
+        </Card>
       ) : null}
 
-      {loadingCache ? <Text>Carregando cache local...</Text> : null}
-
-      {!loadingCache && !item ? <Text style={styles.empty}>Item nao encontrado no cache.</Text> : null}
-
       {!loadingCache && item ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>ID</Text>
-          <Text style={styles.value}>{item.id}</Text>
+        <>
+          <View style={styles.topActions}>
+            <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite()}>
+              <Ionicons
+                name={isFavorite(item.id) ? "star" : "star-outline"}
+                size={17}
+                color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+              />
+              <Text style={styles.favoriteText}>{isFavorite(item.id) ? "Favoritado" : "Favoritar"}</Text>
+            </Pressable>
+          </View>
 
-          <Text style={styles.label}>Titulo</Text>
-          <Text style={styles.value}>{item.title}</Text>
+          {item.type !== "text" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
 
-          <Text style={styles.label}>Tipo</Text>
-          <Text style={styles.value}>{item.type}</Text>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {item.description ?? "Sem descricao cadastrada."}
+          </Text>
 
-          <Text style={styles.label}>Descricao</Text>
-          <Text style={styles.value}>{item.description ?? "-"}</Text>
+          {item.type === "pdf" ? (
+            <PrimaryButton
+              label="Ler Documento (PDF)"
+              onPress={() => void handleOpenPreferred()}
+              disabled={busy}
+            />
+          ) : null}
 
-          <Text style={styles.label}>Tags</Text>
-          <Text style={styles.value}>{item.tags?.join(", ") ?? "-"}</Text>
+          {item.type === "image" ? (
+            <PrimaryButton
+              label="Visualizar Imagem Ampliada"
+              onPress={() => void handleOpenPreferred()}
+              disabled={busy}
+            />
+          ) : null}
 
-          <Text style={styles.label}>Atualizado em</Text>
-          <Text style={styles.value}>{item.updated_at}</Text>
+          {item.type === "audio" ? (
+            <Card style={styles.audioCard}>
+              <Pressable
+                style={({ pressed }) => [styles.playCircle, pressed ? styles.playCirclePressed : null]}
+                onPress={() => void handleAudioPlayPause()}
+                disabled={audioBusy}
+              >
+                <Ionicons
+                  name={audioStatus.playing ? "pause" : "play"}
+                  size={26}
+                  color={colors.white}
+                  style={styles.playIcon}
+                />
+              </Pressable>
 
-          <Text style={styles.label}>storage_path</Text>
-          <Text style={styles.value}>{item.storage_path ?? "-"}</Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, audioProgress)) * 100}%` }]} />
+              </View>
 
-          {remoteUrl ? (
-            <>
-              <Text style={styles.label}>URL publica (texto)</Text>
-              <Text style={styles.value}>{remoteUrl}</Text>
-            </>
+              <View style={styles.timeRow}>
+                <Text style={styles.timeText}>{formatSeconds(audioCurrentTime)}</Text>
+                <Text style={styles.timeText}>{formatSeconds(audioDuration)}</Text>
+              </View>
+
+              <View style={styles.lyricsBox}>
+                <Text style={styles.lyricsLabel}>LETRA DA CANCAO</Text>
+                <ScrollView nestedScrollEnabled style={styles.lyricsScroll}>
+                  <Text style={styles.lyricsText}>{lyricsText}</Text>
+                </ScrollView>
+              </View>
+            </Card>
           ) : null}
 
           {item.type === "text" ? (
-            <>
-              <Text style={styles.label}>text_body</Text>
-              <Text style={styles.value}>{item.text_body}</Text>
-            </>
+            <Card>
+              <Text style={styles.textBody}>{item.text_body ?? "Sem conteudo textual."}</Text>
+            </Card>
           ) : null}
 
           {isMediaItem ? (
-            <>
-              <Text style={styles.label}>Status offline</Text>
-              <Text style={styles.value}>{isDownloaded ? "Baixado" : "Nao baixado"}</Text>
-            </>
+            <Card>
+              <View style={styles.offlineHeader}>
+                <Text style={styles.offlineTitle}>Disponibilidade Offline</Text>
+                <Text style={styles.offlineSize}>{offlineSizeLabel}</Text>
+              </View>
+
+              {!isDownloaded ? (
+                <OutlineButton
+                  label={busy ? "Baixando..." : "Baixar para Offline"}
+                  onPress={() => void handleDownload()}
+                  disabled={busy}
+                />
+              ) : (
+                <OutlineButton
+                  label={busy ? "Removendo..." : "Remover download"}
+                  onPress={() => void handleRemoveDownload()}
+                  disabled={busy}
+                />
+              )}
+
+              <OutlineButton label="Abrir remoto" onPress={() => void handleOpenRemote()} disabled={busy} />
+            </Card>
           ) : null}
-        </View>
+
+          {message ? (
+            <Card>
+              <Text style={styles.message}>{message}</Text>
+            </Card>
+          ) : null}
+        </>
       ) : null}
-
-      {item?.type === "image" && remoteUrl ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>Preview da imagem ({isDownloaded ? "local" : "remota"})</Text>
-          <Image
-            source={{ uri: downloadedEntry?.localUri ?? remoteUrl }}
-            style={styles.imagePreview}
-            resizeMode="contain"
-          />
-        </View>
-      ) : null}
-
-      {item?.type === "audio" && remoteUrl ? (
-        <View style={styles.actionsRow}>
-          <Pressable style={styles.button} onPress={handleAudioPlayPause} disabled={audioBusy}>
-            <Text style={styles.buttonText}>
-              {audioBusy ? "Processando..." : audioStatus.playing ? "Pausar audio" : "Tocar audio"}
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {isMediaItem ? (
-        <View style={styles.actionsRow}>
-          {!isDownloaded ? (
-            <Pressable style={styles.button} onPress={handleDownload} disabled={busy}>
-              <Text style={styles.buttonText}>{busy ? "Baixando..." : "Baixar"}</Text>
-            </Pressable>
-          ) : (
-            <>
-              <Pressable style={styles.button} onPress={handleOpenPreferred} disabled={busy}>
-                <Text style={styles.buttonText}>Abrir offline</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={handleRemoveDownload} disabled={busy}>
-                <Text style={styles.secondaryButtonText}>Remover download</Text>
-              </Pressable>
-            </>
-          )}
-          <Pressable style={styles.secondaryButton} onPress={handleOpenRemote} disabled={busy}>
-            <Text style={styles.secondaryButtonText}>Abrir remoto</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {item?.type === "pdf" ? (
-        <Text style={styles.hint}>
-          PDF: abertura no viewer embutido (WebView + pdf.js), com suporte local/remoto.
-        </Text>
-      ) : null}
-
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-
-      <Pressable style={styles.button} onPress={() => router.back()}>
-        <Text style={styles.buttonText}>Voltar</Text>
-      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 16,
     gap: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.gray100,
+  },
+  metaText: {
+    fontSize: 14,
+    color: colors.gray700,
+  },
+  topActions: {
+    alignItems: "flex-end",
+  },
+  favoriteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+  },
+  favoriteText: {
+    fontSize: 13,
+    color: colors.gray500,
+    fontWeight: "600",
   },
   title: {
-    fontSize: 24,
+    fontSize: 29,
+    lineHeight: 34,
+    color: colors.gray900,
     fontWeight: "700",
   },
   subtitle: {
     fontSize: 14,
-    color: "#555",
+    color: colors.gray500,
+    marginTop: -2,
   },
-  empty: {
-    fontSize: 14,
-    color: "#666",
-    backgroundColor: "#f3f3f3",
-    borderRadius: 8,
-    padding: 10,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: "#f8f8f8",
-  },
-  label: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 8,
-  },
-  value: {
-    fontSize: 15,
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  imagePreview: {
-    width: "100%",
-    height: 220,
-    marginTop: 8,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-  },
-  actionsRow: {
-    flexDirection: "row",
+  audioCard: {
     gap: 10,
-    flexWrap: "wrap",
   },
-  button: {
-    marginTop: 8,
-    backgroundColor: "#1f6feb",
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
+  playCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 999,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.army600,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    elevation: 2,
   },
-  buttonText: {
-    color: "#fff",
+  playCirclePressed: {
+    backgroundColor: colors.army700,
+  },
+  playIcon: {
+    marginLeft: 2,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: colors.gray300,
+    borderRadius: 999,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  progressFill: {
+    height: 4,
+    backgroundColor: colors.army600,
+  },
+  timeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  timeText: {
+    fontSize: 11,
+    color: colors.gray500,
     fontWeight: "600",
   },
-  secondaryButton: {
-    marginTop: 8,
+  lyricsBox: {
     borderWidth: 1,
-    borderColor: "#1f6feb",
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
-    backgroundColor: "#fff",
+    borderColor: colors.gray300,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    padding: 10,
+    gap: 8,
+    minHeight: 180,
   },
-  secondaryButtonText: {
-    color: "#1f6feb",
+  lyricsLabel: {
+    fontSize: 11,
+    color: colors.gray500,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.4,
+  },
+  lyricsScroll: {
+    maxHeight: 165,
+  },
+  lyricsText: {
+    color: colors.gray700,
+    textAlign: "center",
+    fontStyle: "italic",
+    fontFamily: "serif",
+    fontSize: 17,
+    lineHeight: 28,
+  },
+  textBody: {
+    color: colors.gray700,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  offlineHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  offlineTitle: {
+    fontSize: 15,
+    color: colors.gray700,
+    fontWeight: "700",
+  },
+  offlineSize: {
+    fontSize: 12,
+    color: colors.gray500,
     fontWeight: "600",
   },
   message: {
     fontSize: 14,
-    color: "#444",
-    backgroundColor: "#f3f3f3",
-    borderRadius: 8,
-    padding: 10,
-  },
-  hint: {
-    fontSize: 13,
-    color: "#666",
-    fontStyle: "italic",
-  },
-  favoriteButton: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
-    backgroundColor: colors.white,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  favoriteButtonText: {
     color: colors.gray700,
-    fontWeight: "600",
   },
 });
+
+function formatSeconds(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const total = Math.floor(value);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
 
 function toMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {

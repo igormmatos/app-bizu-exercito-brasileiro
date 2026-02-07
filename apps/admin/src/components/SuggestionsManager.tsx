@@ -7,6 +7,7 @@ import {
   SuggestionsPermissionError,
   updateSuggestionStatus,
 } from "../lib/suggestionsApi";
+import { Badge, Button, Card, Input, Modal } from "./ui";
 
 const PAGE_SIZE = 50;
 const BASE_CATEGORY_OPTIONS = ["Conteudo", "Bug", "UX", "Outro"];
@@ -39,16 +40,13 @@ export function SuggestionsManager() {
 
     for (const suggestion of suggestions) {
       const category = suggestion.category?.trim();
-      if (!category || seen.has(category)) {
-        continue;
-      }
+      if (!category || seen.has(category)) continue;
       seen.add(category);
       options.push(category);
     }
 
-    const normalizedFilterCategory = categoryFilter.trim();
-    if (normalizedFilterCategory && normalizedFilterCategory !== "all" && !seen.has(normalizedFilterCategory)) {
-      options.unshift(normalizedFilterCategory);
+    if (categoryFilter !== "all" && categoryFilter && !seen.has(categoryFilter)) {
+      options.unshift(categoryFilter);
     }
 
     return options;
@@ -88,7 +86,6 @@ export function SuggestionsManager() {
 
     const nextPage = page + 1;
     setLoadingMore(true);
-    setError(null);
 
     try {
       const result = await listSuggestions({
@@ -117,6 +114,7 @@ export function SuggestionsManager() {
   function openDetails(suggestion: Suggestion) {
     setSelected(suggestion);
     setStatusDraft(suggestion.status);
+    setStatusReadOnly(false);
     setModalNotice(null);
   }
 
@@ -138,6 +136,7 @@ export function SuggestionsManager() {
       setSuggestions((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setSelected(updated);
       setStatusDraft(updated.status);
+      setStatusReadOnly(false);
     } catch (updateError) {
       if (updateError instanceof SuggestionsPermissionError) {
         setStatusReadOnly(true);
@@ -152,61 +151,68 @@ export function SuggestionsManager() {
 
   return (
     <section className="section">
-      <header className="section-header">
-        <h2>Sugestoes</h2>
-        <button onClick={() => void refreshFirstPage()} disabled={loading}>
+      <header className="page-header">
+        <div>
+          <h1>Sugestoes</h1>
+          <p className="text-muted">{suggestions.length} registros na listagem atual</p>
+        </div>
+        <Button variant="outline" onClick={() => void refreshFirstPage()} disabled={loading}>
           Atualizar
-        </button>
+        </Button>
       </header>
 
-      <form className="panel filters" onSubmit={handleSearch}>
-        <label>
-          Status
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as SuggestionStatusFilter)}
-          >
-            <option value="all">Todos</option>
-            <option value="new">new</option>
-            <option value="triaged">triaged</option>
-            <option value="done">done</option>
-          </select>
-        </label>
+      <Card>
+        <form className="filters-grid" onSubmit={handleSearch}>
+          <label className="ui-field">
+            <span className="ui-field__label">Status</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as SuggestionStatusFilter)}
+              className="ui-select"
+            >
+              <option value="all">Todos</option>
+              <option value="new">new</option>
+              <option value="triaged">triaged</option>
+              <option value="done">done</option>
+            </select>
+          </label>
 
-        <label>
-          Categoria
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-            <option value="all">Todas</option>
-            {categoryOptions.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="ui-field">
+            <span className="ui-field__label">Categoria</span>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="ui-select">
+              <option value="all">Todas</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="suggestions-search">
-          Busca (mensagem)
-          <input
+          <Input
+            label="Busca (mensagem)"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Ex: login, conteudo, erro..."
           />
-        </label>
 
-        <div className="actions">
-          <button type="submit">Buscar</button>
-        </div>
-      </form>
+          <div className="filters-actions">
+            <Button type="submit">Buscar</Button>
+          </div>
+        </form>
+      </Card>
 
       {error ? <div className="error-box">{error}</div> : null}
+      {loading ? <p className="text-muted">Carregando sugestoes...</p> : null}
 
-      <div className="panel">
-        <h3>Lista ({suggestions.length})</h3>
-        {loading ? <p>Carregando sugestoes...</p> : null}
-        {!loading && suggestions.length === 0 ? <p>Nenhuma sugestao encontrada.</p> : null}
+      {!loading && suggestions.length === 0 ? (
+        <Card>
+          <p className="text-muted">Nenhuma sugestao encontrada.</p>
+        </Card>
+      ) : null}
 
-        {!loading && suggestions.length > 0 ? (
+      {!loading && suggestions.length > 0 ? (
+        <Card className="table-card">
           <table className="table">
             <thead>
               <tr>
@@ -223,47 +229,57 @@ export function SuggestionsManager() {
                 <tr key={suggestion.id}>
                   <td>{formatDate(suggestion.created_at)}</td>
                   <td>
-                    <span className={`status-badge status-${suggestion.status}`}>{suggestion.status}</span>
+                    <Badge variant={statusBadgeVariant(suggestion.status)}>{suggestion.status}</Badge>
                   </td>
                   <td>{suggestion.category ?? "-"}</td>
                   <td>{suggestion.contact ?? "-"}</td>
                   <td className="message-preview">{toPreview(suggestion.message)}</td>
-                  <td className="actions">
-                    <button type="button" onClick={() => openDetails(suggestion)}>
+                  <td>
+                    <Button size="sm" variant="outline" onClick={() => openDetails(suggestion)}>
                       Ver
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        ) : null}
 
-        {hasMore ? (
-          <div className="actions">
-            <button type="button" onClick={() => void handleLoadMore()} disabled={loadingMore}>
-              {loadingMore ? "Carregando..." : "Carregar mais"}
-            </button>
-          </div>
-        ) : null}
-      </div>
+          {hasMore ? (
+            <div className="actions">
+              <Button variant="ghost" onClick={() => void handleLoadMore()} disabled={loadingMore}>
+                {loadingMore ? "Carregando..." : "Carregar mais"}
+              </Button>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
 
-      {selected ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="suggestion-detail-title">
-          <div className="modal-panel">
-            <header className="section-header">
-              <h3 id="suggestion-detail-title">Detalhe da sugestao</h3>
-              <button type="button" className="ghost" onClick={closeDetails}>
-                Fechar
-              </button>
-            </header>
-
+      <Modal
+        open={Boolean(selected)}
+        title="Detalhe da sugestao"
+        onClose={closeDetails}
+        footer={
+          <>
+            <Button variant="outline" onClick={closeDetails}>
+              Fechar
+            </Button>
+            <Button
+              onClick={() => void handleSaveStatus()}
+              disabled={statusReadOnly || savingStatus || !selected || statusDraft === selected.status}
+            >
+              {savingStatus ? "Salvando..." : "Salvar status"}
+            </Button>
+          </>
+        }
+      >
+        {selected ? (
+          <div className="suggestion-detail">
             <div className="suggestion-detail-grid">
               <div>
                 <strong>Criada em:</strong> {formatDate(selected.created_at)}
               </div>
               <div>
-                <strong>Status:</strong> <span className={`status-badge status-${selected.status}`}>{selected.status}</span>
+                <strong>Status:</strong> <Badge variant={statusBadgeVariant(selected.status)}>{selected.status}</Badge>
               </div>
               <div>
                 <strong>Categoria:</strong> {selected.category ?? "-"}
@@ -279,44 +295,40 @@ export function SuggestionsManager() {
               </div>
             </div>
 
-            <div className="panel">
+            <Card>
               <strong>Mensagem</strong>
               <p className="message-full">{selected.message}</p>
-            </div>
+            </Card>
 
-            <div className="panel form-grid">
-              <h4>Atualizar status</h4>
-              <label>
-                Status
-                <select
-                  value={statusDraft}
-                  onChange={(event) => setStatusDraft(event.target.value as SuggestionStatus)}
-                  disabled={statusReadOnly}
-                >
-                  <option value="new">new</option>
-                  <option value="triaged">triaged</option>
-                  <option value="done">done</option>
-                </select>
-              </label>
-              <div className="actions">
-                <button
-                  type="button"
-                  onClick={() => void handleSaveStatus()}
-                  disabled={statusReadOnly || savingStatus || statusDraft === selected.status}
-                >
-                  {savingStatus ? "Salvando..." : "Salvar"}
-                </button>
-              </div>
-              {statusReadOnly ? (
-                <div className="readonly-note">Sem permissao para alterar status; somente leitura.</div>
-              ) : null}
-              {modalNotice ? <div className="error-box">{modalNotice}</div> : null}
-            </div>
+            <label className="ui-field">
+              <span className="ui-field__label">Atualizar status</span>
+              <select
+                value={statusDraft}
+                onChange={(event) => setStatusDraft(event.target.value as SuggestionStatus)}
+                disabled={statusReadOnly}
+                className="ui-select"
+              >
+                <option value="new">new</option>
+                <option value="triaged">triaged</option>
+                <option value="done">done</option>
+              </select>
+            </label>
+
+            {statusReadOnly ? (
+              <div className="readonly-note">Sem permissao para alterar status; somente leitura.</div>
+            ) : null}
+            {modalNotice ? <div className="error-box">{modalNotice}</div> : null}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </Modal>
     </section>
   );
+}
+
+function statusBadgeVariant(status: SuggestionStatus): "success" | "warning" | "neutral" | "info" {
+  if (status === "done") return "success";
+  if (status === "triaged") return "info";
+  return "warning";
 }
 
 function formatDate(value: string): string {

@@ -29,6 +29,8 @@
 - [x] `C20` Sugestoes: SQL + RLS + policies.
 - [x] `C21` Sugestao real (anon insert) implementada no mobile.
 - [x] `C22` Admin: listar e tratar sugestoes autenticadas.
+- [x] `C23` Polimento visual conforme prototipo (UI kit + telas principais, sem botao sair).
+- [x] `C24` Polimento visual Admin conforme prototipo.
 
 ## 🕒 Log de Execucoes do Codex
 - `2026-02-07 10:49 (local)` Atualizados `README.md` e `TODO.md` para refletir o estado atual do monorepo, arquitetura, fluxo de dados e plano de execucao. Tarefas impactadas: `C1`, `C2`, `C3`, `C4`, `C5`, `C6`, `C7`, `B1`, `B2`, `B3`, `B4`, `B5`.
@@ -47,3 +49,5 @@
 - `2026-02-07 17:19 (local)` Criados scripts `database/007_suggestions_tables.sql`, `database/008_suggestions_rls.sql` e `database/009_suggestions_policies.sql` para suportar sugestoes com insert anonimo, leitura autenticada e update restrito a `status`; `database/README.md` atualizado com nova ordem de execucao. Tarefas impactadas: `C20`, `B4`.
 - `2026-02-07 17:49 (local)` Implementado envio real de sugestao em `apps/mobile`: novo client `src/lib/suggestionsApi.ts`, tab `Sugestao` com select de categoria, email opcional, mensagem obrigatoria (max 2000), loading/sucesso/erro e insert anonimo em `public.suggestions`. Tarefas impactadas: `C21`, `B5`.
 - `2026-02-07 18:27 (local)` Implementada secao `Sugestoes` no `apps/admin` com aba dedicada, listagem autenticada ordenada por `created_at desc`, filtros por status/categoria, busca simples em mensagem, detalhe em modal e atualizacao de status com fallback para somente leitura quando sem permissao RLS/GRANT. Tarefas impactadas: `C22`, `B5`.
+- `2026-02-07 18:57 (local)` Aplicado polimento visual no `apps/mobile` com mini UI-kit (`Card`, `PillBadge`, `PrimaryButton`, `OutlineButton`, `SearchBar`, `ContentListItem`, `PreviewPlaceholder`) e reestilizacao das telas Home, Category, Search, Item Detail, Favoritos e Sugestao para o padrao do prototipo, mantendo logica existente e sem botao sair no header. Tarefas impactadas: `C23`, `B5`.
+- `2026-02-07 19:19 (local)` Aplicado polimento visual no `apps/admin`: novo `AdminShell` com sidebar institucional, UI-kit (`Button`, `Card`, `Badge`, `Input`, `Modal`), telas de `Dashboard` (cards + grafico), `Gerenciar Conteudo` (toolbar/tabela/modal), `Categorias` (grid com destaque de rascunho), `Auditoria` (feed com badges/timestamps) e reestilizacao de `Login`/`Sugestoes`, mantendo regras de negocio existentes. Tarefas impactadas: `C24`, `B5`.

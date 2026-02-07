@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Card, ContentListItem } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
-import { colors } from "@/src/theme/tokens";
+import { type ContentType, colors } from "@/src/theme/tokens";
 
 export default function FavoritesScreen() {
   const router = useRouter();
@@ -27,38 +28,38 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Favoritos</Text>
-      <Text style={styles.subtitle}>Acesso rapido aos itens marcados localmente.</Text>
-
-      {loadingCache || loadingFavorites ? (
-        <Text style={styles.subtitle}>Carregando favoritos...</Text>
-      ) : null}
+      {loadingCache || loadingFavorites ? <Text style={styles.metaText}>Carregando favoritos...</Text> : null}
 
       {!loadingCache && !loadingFavorites && favoriteItems.length === 0 ? (
-        <View style={styles.emptyCard}>
+        <Card style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Nenhum favorito ainda</Text>
           <Text style={styles.emptyText}>Voce ainda nao favoritou nenhum item.</Text>
-        </View>
+        </Card>
       ) : null}
 
       {!loadingCache && !loadingFavorites
         ? favoriteItems.map((item) => (
-            <View key={item.id} style={styles.card}>
-              <Pressable
-                style={styles.cardMain}
-                onPress={() =>
-                  router.push({
-                    pathname: "/item/[id]",
-                    params: { id: item.id },
-                  })
-                }
-              >
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardMeta}>{item.type}</Text>
-              </Pressable>
-              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite(item.id)}>
-                <Ionicons name="star" size={18} color={colors.army600} />
-              </Pressable>
-            </View>
+            <ContentListItem
+              key={item.id}
+              type={item.type as ContentType}
+              title={item.title}
+              subtitle={item.description ?? item.type}
+              onPress={() =>
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: item.id },
+                })
+              }
+              trailing={
+                <Pressable
+                  style={styles.favoriteIconButton}
+                  onPress={() => void handleToggleFavorite(item.id)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="star" size={18} color="#F59E0B" />
+                </Pressable>
+              }
+            />
           ))
         : null}
     </View>
@@ -72,58 +73,29 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.gray100,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.gray900,
-  },
-  subtitle: {
+  metaText: {
     fontSize: 14,
     color: colors.gray700,
   },
   emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    padding: 14,
+    alignItems: "center",
+    paddingVertical: 18,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    color: colors.gray900,
+    fontWeight: "700",
   },
   emptyText: {
     fontSize: 14,
-    color: colors.gray700,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  cardMain: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.gray900,
-  },
-  cardMeta: {
-    marginTop: 4,
-    fontSize: 13,
     color: colors.gray500,
+    textAlign: "center",
   },
-  favoriteButton: {
-    borderWidth: 1,
-    borderColor: colors.gray100,
-    borderRadius: 999,
-    width: 34,
-    height: 34,
+  favoriteIconButton: {
+    minWidth: 28,
+    minHeight: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.white,
   },
 });
