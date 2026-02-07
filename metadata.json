@@ -1,0 +1,5 @@
+{
+  "name": "Bizus do Exército - Painel Admin",
+  "description": "Painel administrativo web para gestão de conteúdo do aplicativo Bizus do Exército Brasileiro. Gerenciamento de PDFs, Áudios e categorias.",
+  "requestFramePermissions": []
+}
