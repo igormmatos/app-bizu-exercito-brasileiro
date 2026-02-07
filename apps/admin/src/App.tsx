@@ -2,8 +2,9 @@ import { useState } from "react";
 import { AuthGate } from "./components/AuthGate";
 import { CategoryManager } from "./components/CategoryManager";
 import { ItemManager } from "./components/ItemManager";
+import { SuggestionsManager } from "./components/SuggestionsManager";
 
-type View = "categories" | "items";
+type View = "categories" | "items" | "suggestions";
 
 export default function App() {
   const [view, setView] = useState<View>("categories");
@@ -32,9 +33,19 @@ export default function App() {
             <button className={view === "items" ? "active" : ""} onClick={() => setView("items")}>
               Itens
             </button>
+            <button
+              className={view === "suggestions" ? "active" : ""}
+              onClick={() => setView("suggestions")}
+            >
+              Sugestoes
+            </button>
           </nav>
 
-          <main>{view === "categories" ? <CategoryManager /> : <ItemManager />}</main>
+          <main>
+            {view === "categories" ? <CategoryManager /> : null}
+            {view === "items" ? <ItemManager /> : null}
+            {view === "suggestions" ? <SuggestionsManager /> : null}
+          </main>
         </div>
       )}
     </AuthGate>

@@ -33,6 +33,26 @@ Na raiz do monorepo:
 - `npm run ios -w apps/mobile`
 - `npm run web -w apps/mobile`
 
+## Navegacao base
+- Tabs principais: `Home`, `Favoritos`, `Sugestao`.
+- Busca global fica no Header (nao e tab) e abre a rota `/search`.
+- `Admin/Diagnostico` fica fora da tab bar em `/admin`.
+- Atalho tecnico: long-press no titulo `Bizus EB` no Header para abrir `/admin`.
+
+## Favoritos (offline-first)
+- Favoritos sao locais (AsyncStorage) com chave `favorites.itemIds`.
+- E possivel favoritar/desfavoritar no detalhe do item e nas listas (Home/Category/Search).
+- A tab `Favoritos` resolve os ids no catalogo em memoria e exibe apenas itens existentes.
+- Empty state: `Voce ainda nao favoritou nenhum item.`
+
+## Bizu do Dia
+- A Home mostra um card de destaque `Bizu do Dia` com 1 item do catalogo local.
+- A escolha e deterministica por dia e persistida em AsyncStorage:
+  - `bizu.todayKey`
+  - `bizu.itemId`
+- O item se mantem estavel durante o mesmo dia, mesmo com reabertura do app.
+- Na rota tecnica `/admin`, existe o botao `Recalcular Bizu do Dia`.
+
 ## Downloads offline (media)
 - Itens `pdf`, `audio` e `image` podem ser baixados na tela de detalhe do item.
 - Os arquivos ficam em `FileSystem.documentDirectory + "downloads/"`, organizados por tipo:

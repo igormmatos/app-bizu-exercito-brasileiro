@@ -1,10 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useCatalog } from "@/src/state/catalogContext";
+import { colors } from "@/src/theme/tokens";
 
 export default function AdminDiagnosticScreen() {
   const {
     categories,
     items,
+    bizuOfTheDay,
+    loadingBizu,
     lastSyncAt,
     downloadedCount,
     loadingCache,
@@ -15,9 +18,10 @@ export default function AdminDiagnosticScreen() {
     clearNow,
     reloadDownloads,
     clearDownloadsNow,
+    recalculateBizuOfTheDay,
   } = useCatalog();
 
-  const busy = syncing || loadingDownloads;
+  const busy = syncing || loadingDownloads || loadingBizu;
 
   async function handleSync() {
     try {
@@ -44,10 +48,18 @@ export default function AdminDiagnosticScreen() {
     }
   }
 
+  async function handleRecalculateBizu() {
+    try {
+      await recalculateBizuOfTheDay();
+    } catch {
+      // message is handled in context state
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Admin/Diagnostico</Text>
-      <Text style={styles.line}>Sync manual do catalogo publicado.</Text>
+      <Text style={styles.line}>Rota tecnica (fora da barra de abas).</Text>
 
       {loadingCache ? <Text style={styles.line}>Carregando cache local...</Text> : null}
       {loadingDownloads ? <Text style={styles.line}>Carregando status de downloads...</Text> : null}
@@ -56,6 +68,7 @@ export default function AdminDiagnosticScreen() {
         <Text style={styles.kv}>Categorias em cache: {categories.length}</Text>
         <Text style={styles.kv}>Itens em cache: {items.length}</Text>
         <Text style={styles.kv}>Itens baixados: {downloadedCount}</Text>
+        <Text style={styles.kv}>Bizu do Dia: {bizuOfTheDay?.title ?? "nenhum"}</Text>
         <Text style={styles.kv}>Ultimo sync: {lastSyncAt ?? "nunca"}</Text>
       </View>
 
@@ -71,6 +84,10 @@ export default function AdminDiagnosticScreen() {
         <Pressable style={styles.secondaryButton} onPress={handleClearDownloads} disabled={busy}>
           <Text style={styles.secondaryButtonText}>Limpar downloads</Text>
         </Pressable>
+
+        <Pressable style={styles.secondaryButton} onPress={handleRecalculateBizu} disabled={busy}>
+          <Text style={styles.secondaryButtonText}>Recalcular Bizu do Dia</Text>
+        </Pressable>
       </View>
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -83,28 +100,29 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     gap: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.gray100,
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
+    color: colors.gray900,
     marginBottom: 4,
   },
   line: {
     fontSize: 15,
-    color: "#333",
+    color: colors.gray700,
   },
   card: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: colors.gray100,
     borderRadius: 10,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: colors.white,
     padding: 12,
     gap: 6,
   },
   kv: {
     fontSize: 15,
-    color: "#333",
+    color: colors.gray700,
   },
   actions: {
     flexDirection: "row",
@@ -112,31 +130,31 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   primaryButton: {
-    backgroundColor: "#1f6feb",
+    backgroundColor: colors.army600,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   primaryButtonText: {
-    color: "#fff",
+    color: colors.white,
     fontWeight: "600",
   },
   secondaryButton: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: "#1f6feb",
+    borderColor: colors.army600,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   secondaryButtonText: {
-    color: "#1f6feb",
+    color: colors.army600,
     fontWeight: "600",
   },
   message: {
     fontSize: 14,
-    color: "#444",
-    backgroundColor: "#f3f3f3",
+    color: colors.gray700,
+    backgroundColor: colors.white,
     borderRadius: 8,
     padding: 10,
   },

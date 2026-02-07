@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -10,11 +11,12 @@ import {
   removeCategoryDownloads,
   type BatchProgress,
 } from "@/src/lib/batchDownload";
+import { colors } from "@/src/theme/tokens";
 
 export default function CategoryItemsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { categories, items, downloadedMap, loadingCache, reloadDownloads } = useCatalog();
+  const { categories, items, downloadedMap, loadingCache, reloadDownloads, isFavorite, toggleFavorite } = useCatalog();
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [batchStatus, setBatchStatus] = useState<"idle" | "downloading" | "removing" | "cancelled" | "error">("idle");
   const [batchMessage, setBatchMessage] = useState<string | null>(null);
@@ -126,6 +128,14 @@ export default function CategoryItemsScreen() {
     }
   }
 
+  async function handleToggleFavorite(id: string) {
+    try {
+      await toggleFavorite(id);
+    } catch {
+      // message handled in context
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{category?.name ?? "Categoria"}</Text>
@@ -192,24 +202,32 @@ export default function CategoryItemsScreen() {
 
       {!loadingCache && category
         ? categoryItems.map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.card}
-              onPress={() =>
-                router.push({
-                  pathname: "/item/[id]",
-                  params: { id: item.id },
-                })
-              }
-            >
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardMeta}>
-                {item.type} • {item.published ? "publicado" : "rascunho"}
-              </Text>
-              {item.type !== "text" && downloadedMap[item.id] ? (
-                <Text style={styles.offline}>Offline</Text>
-              ) : null}
-            </Pressable>
+            <View key={item.id} style={styles.card}>
+              <Pressable
+                style={styles.cardMain}
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item.id },
+                  })
+                }
+              >
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardMeta}>
+                  {item.type} • {item.published ? "publicado" : "rascunho"}
+                </Text>
+                {item.type !== "text" && downloadedMap[item.id] ? (
+                  <Text style={styles.offline}>Offline</Text>
+                ) : null}
+              </Pressable>
+              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite(item.id)}>
+                <Ionicons
+                  name={isFavorite(item.id) ? "star" : "star-outline"}
+                  size={18}
+                  color={isFavorite(item.id) ? colors.army600 : colors.gray500}
+                />
+              </Pressable>
+            </View>
           ))
         : null}
     </ScrollView>
@@ -244,6 +262,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     backgroundColor: "#f8f8f8",
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  cardMain: {
+    flex: 1,
   },
   cardTitle: {
     fontSize: 17,
@@ -314,6 +338,16 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: "#1f6feb",
     fontWeight: "600",
+  },
+  favoriteButton: {
+    borderWidth: 1,
+    borderColor: colors.gray100,
+    borderRadius: 999,
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
   },
 });
 

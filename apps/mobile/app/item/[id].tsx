@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
@@ -14,11 +15,12 @@ import {
 import { useCatalog } from "@/src/state/catalogContext";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
 import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "@/src/lib/downloadManager";
+import { colors } from "@/src/theme/tokens";
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { items, downloadedMap, loadingCache, reloadDownloads } = useCatalog();
+  const { items, downloadedMap, loadingCache, reloadDownloads, isFavorite, toggleFavorite } = useCatalog();
   const item = items.find((entry) => entry.id === id);
   const [busy, setBusy] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -160,10 +162,32 @@ export default function ItemDetailScreen() {
     }
   }
 
+  async function handleToggleFavorite() {
+    if (!item) return;
+    try {
+      await toggleFavorite(item.id);
+    } catch {
+      // message handled in context
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Item Detail</Text>
       <Text style={styles.subtitle}>Detalhes do item em cache e controle offline.</Text>
+
+      {item ? (
+        <Pressable style={styles.favoriteButton} onPress={handleToggleFavorite}>
+          <Ionicons
+            name={isFavorite(item.id) ? "star" : "star-outline"}
+            size={16}
+            color={isFavorite(item.id) ? colors.army600 : colors.gray700}
+          />
+          <Text style={styles.favoriteButtonText}>
+            {isFavorite(item.id) ? "Desfavoritar" : "Favoritar"}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {loadingCache ? <Text>Carregando cache local...</Text> : null}
 
@@ -361,6 +385,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     fontStyle: "italic",
+  },
+  favoriteButton: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: colors.gray100,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  favoriteButtonText: {
+    color: colors.gray700,
+    fontWeight: "600",
   },
 });
 
