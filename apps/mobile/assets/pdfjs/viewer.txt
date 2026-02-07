@@ -1,0 +1,165 @@
+(function () {
+  var statusEl = document.getElementById("status");
+  var metaEl = document.getElementById("meta");
+  var canvas = document.getElementById("pdfCanvas");
+  var prevBtn = document.getElementById("prevBtn");
+  var nextBtn = document.getElementById("nextBtn");
+  var zoomInBtn = document.getElementById("zoomInBtn");
+  var zoomOutBtn = document.getElementById("zoomOutBtn");
+  var ctx = canvas.getContext("2d");
+
+  var pdfDoc = null;
+  var pageNum = 1;
+  var scale = 1.2;
+  var rendering = false;
+  var pendingPage = null;
+
+  function postToReact(payload) {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+    }
+  }
+
+  function setStatus(text) {
+    statusEl.textContent = text;
+  }
+
+  function updateMeta() {
+    var total = pdfDoc ? pdfDoc.numPages : 0;
+    metaEl.textContent = "Page " + pageNum + "/" + total + " | Zoom " + Math.round(scale * 100) + "%";
+    prevBtn.disabled = !pdfDoc || pageNum <= 1 || rendering;
+    nextBtn.disabled = !pdfDoc || pageNum >= total || rendering;
+    zoomInBtn.disabled = !pdfDoc || rendering;
+    zoomOutBtn.disabled = !pdfDoc || rendering || scale <= 0.6;
+  }
+
+  function renderPage(num) {
+    if (!pdfDoc) return;
+    rendering = true;
+    updateMeta();
+    setStatus("Renderizando pagina " + num + "...");
+    postToReact({ type: "loading", page: num, total: pdfDoc.numPages });
+
+    pdfDoc
+      .getPage(num)
+      .then(function (page) {
+        var viewport = page.getViewport({ scale: scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        return page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      })
+      .then(function () {
+        rendering = false;
+        setStatus("PDF carregado.");
+        updateMeta();
+        postToReact({ type: "loaded", page: pageNum, total: pdfDoc.numPages });
+        if (pendingPage !== null) {
+          var next = pendingPage;
+          pendingPage = null;
+          queueRender(next);
+        }
+      })
+      .catch(function (error) {
+        rendering = false;
+        var message = error && error.message ? error.message : String(error);
+        setStatus("Erro ao renderizar PDF.");
+        updateMeta();
+        postToReact({ type: "error", message: message });
+      });
+  }
+
+  function queueRender(num) {
+    if (rendering) {
+      pendingPage = num;
+      return;
+    }
+    renderPage(num);
+  }
+
+  function loadPdfFromSource(source) {
+    setStatus("Carregando PDF...");
+    postToReact({ type: "loading", page: 0, total: 0 });
+    return window.pdfjsLib
+      .getDocument(source)
+      .promise.then(function (pdf) {
+        pdfDoc = pdf;
+        pageNum = 1;
+        updateMeta();
+        renderPage(pageNum);
+      })
+      .catch(function (error) {
+        var message = error && error.message ? error.message : String(error);
+        setStatus("Falha ao carregar PDF.");
+        postToReact({ type: "error", message: message });
+      });
+  }
+
+  function base64ToUint8Array(base64) {
+    var binary = atob(base64);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  function handleNativeMessage(raw) {
+    try {
+      var payload = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (!payload || payload.type !== "open-base64" || !payload.base64) {
+        return;
+      }
+      var bytes = base64ToUint8Array(payload.base64);
+      loadPdfFromSource({ data: bytes });
+    } catch (error) {
+      var message = error && error.message ? error.message : String(error);
+      setStatus("Falha ao processar PDF local.");
+      postToReact({ type: "error", message: message });
+    }
+  }
+
+  prevBtn.addEventListener("click", function () {
+    if (!pdfDoc || pageNum <= 1) return;
+    pageNum -= 1;
+    queueRender(pageNum);
+  });
+
+  nextBtn.addEventListener("click", function () {
+    if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+    pageNum += 1;
+    queueRender(pageNum);
+  });
+
+  zoomInBtn.addEventListener("click", function () {
+    if (!pdfDoc) return;
+    scale = Math.min(3, scale + 0.2);
+    queueRender(pageNum);
+  });
+
+  zoomOutBtn.addEventListener("click", function () {
+    if (!pdfDoc) return;
+    scale = Math.max(0.6, scale - 0.2);
+    queueRender(pageNum);
+  });
+
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.js";
+
+  window.addEventListener("message", function (event) {
+    handleNativeMessage(event.data);
+  });
+  document.addEventListener("message", function (event) {
+    handleNativeMessage(event.data);
+  });
+
+  var params = new URLSearchParams(window.location.search);
+  var file = params.get("file");
+  updateMeta();
+  postToReact({ type: "viewer-ready" });
+
+  if (file) {
+    loadPdfFromSource({ url: file });
+  } else {
+    setStatus("Aguardando PDF local...");
+  }
+})();
