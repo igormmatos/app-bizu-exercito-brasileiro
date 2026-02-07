@@ -1,20 +1,74 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Bizu EB Monorepo
 
-# Run and deploy your AI Studio app
+## Visao geral
+Este repositorio concentra o projeto Bizu EB em formato monorepo.
 
-This contains everything you need to run your app locally.
+- `Admin Web`: painel de publicacao e gestao de conteudo (React + Vite)
+- `Mobile App`: app de consumo de conteudo com foco offline-first (bootstrap em andamento)
+- `Shared`: pacote para tipos e contratos de dominio reutilizaveis
+- `Supabase`: backend de dados/autenticacao previsto para o fluxo de publicacao e sincronizacao
 
-View your app in AI Studio: https://ai.studio/apps/drive/1p9qJgmjT2eoSukimNPAvJXW8wnNEZXeS
+O `Admin Web` e o canal principal de publicacao de conteudo.
 
-## Run Locally
+## Arquitetura
+- `apps/admin`: aplicacao web administrativa, onde o conteudo e criado e gerenciado
+- `apps/mobile`: aplicacao mobile (Expo) para consumo publico, com area administrativa de diagnostico/sync
+- `packages/shared`: tipos e contratos compartilhados entre admin e mobile
+- `supabase/`: pasta reservada para schema/migrations/seeds (quando versionada no repositorio)
 
-**Prerequisites:**  Node.js
+## Estrutura de pastas
+```text
+.
+├─ apps/
+│  ├─ admin/
+│  └─ mobile/
+├─ packages/
+│  └─ shared/
+├─ docs/
+├─ package.json
+└─ tsconfig.base.json
+```
 
+## Stack tecnologica
+- Monorepo: npm workspaces
+- Admin: React, TypeScript, Vite
+- Mobile: Expo (planejado neste monorepo)
+- Shared: TypeScript
+- Backend: Supabase (integracao do MVP)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Fluxo geral de dados
+1. Conteudo e criado/atualizado no `Admin Web`.
+2. Dados sao persistidos no `Supabase`.
+3. O `Mobile App` sincroniza os dados e mantem cache local para operacao offline-first.
+4. A area administrativa do mobile e usada para diagnostico e controle de sincronizacao.
+
+## Como rodar o Admin localmente
+Pre-requisitos:
+- Node.js 20+
+- npm 10+
+
+Passos:
+1. Na raiz, instale dependencias:
+   - `npm install`
+2. Inicie o admin via workspace:
+   - `npm run dev:admin`
+3. Acesse:
+   - `http://localhost:3000`
+
+Opcional (direto no app):
+- `cd apps/admin`
+- `npm run dev`
+
+## Mobile App (Expo)
+- Localizacao: `apps/mobile`
+- Inicializacao via workspace:
+  - `npm run start -w apps/mobile`
+- Detalhes de execucao e comandos adicionais:
+  - `apps/mobile/README.md`
+
+## Status atual
+MVP em construcao.
+
+- Monorepo inicial criado com `apps/admin`, `apps/mobile` e `packages/shared`
+- Admin web em funcionamento no workspace
+- Mobile e shared ainda em fase de bootstrap de contratos e sincronizacao
