@@ -32,6 +32,7 @@
 - [x] `C23` Polimento visual conforme prototipo (UI kit + telas principais, sem botao sair).
 - [x] `C24` Polimento visual Admin conforme prototipo.
 - [x] `C25` Safe Area (iPhone notch) aplicado no mobile.
+- [x] Arquivo de descrição da loja criado (store/description.txt)
 
 ## 🕒 Log de Execucoes do Codex
 - `2026-02-07 10:49 (local)` Atualizados `README.md` e `TODO.md` para refletir o estado atual do monorepo, arquitetura, fluxo de dados e plano de execucao. Tarefas impactadas: `C1`, `C2`, `C3`, `C4`, `C5`, `C6`, `C7`, `B1`, `B2`, `B3`, `B4`, `B5`.
@@ -53,3 +54,4 @@
 - `2026-02-07 18:57 (local)` Aplicado polimento visual no `apps/mobile` com mini UI-kit (`Card`, `PillBadge`, `PrimaryButton`, `OutlineButton`, `SearchBar`, `ContentListItem`, `PreviewPlaceholder`) e reestilizacao das telas Home, Category, Search, Item Detail, Favoritos e Sugestao para o padrao do prototipo, mantendo logica existente e sem botao sair no header. Tarefas impactadas: `C23`, `B5`.
 - `2026-02-07 19:19 (local)` Aplicado polimento visual no `apps/admin`: novo `AdminShell` com sidebar institucional, UI-kit (`Button`, `Card`, `Badge`, `Input`, `Modal`), telas de `Dashboard` (cards + grafico), `Gerenciar Conteudo` (toolbar/tabela/modal), `Categorias` (grid com destaque de rascunho), `Auditoria` (feed com badges/timestamps) e reestilizacao de `Login`/`Sugestoes`, mantendo regras de negocio existentes. Tarefas impactadas: `C24`, `B5`.
 - `2026-02-07 20:52 (local)` Aplicado Safe Area no `apps/mobile`: `SafeAreaProvider` no root, novos componentes `Screen` e `SafeHeader` com `insets.top`, e padronizacao das telas principais (Home, Favoritos, Sugestao, Categoria, Detalhes e Busca) para evitar corte em notch/Dynamic Island sem alterar logica de negocio. Tarefas impactadas: `C25`, `B5`.
+- `2026-02-07 22:21 (local)` Criado `store/description.txt` com descricao em texto puro para App Store/Play Store, conforme conteudo definido, e atualizado `TODO.md` com item concluido. Tarefas impactadas: `E`, `F`.
