@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet } from "react-native";
+import { SafeHeader } from "@/src/components/layout";
 import { PillBadge } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
@@ -24,12 +25,11 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarItemStyle: styles.tabBarItem,
         header: () => (
-          <View style={styles.headerContainer}>
-            <Pressable onLongPress={openAdmin} delayLongPress={500}>
-              <Text style={styles.headerTitle}>{titleByRoute(route.name)}</Text>
-            </Pressable>
-            {offlineDetected ? <PillBadge label="Offline" tone="offline" /> : null}
-          </View>
+          <SafeHeader
+            title={titleByRoute(route.name)}
+            onTitleLongPress={openAdmin}
+            right={offlineDetected ? <PillBadge label="Offline" tone="offline" /> : null}
+          />
         ),
       })}
     >
@@ -74,20 +74,6 @@ const styles = StyleSheet.create({
   },
   tabBarItem: {
     paddingVertical: 2,
-  },
-  headerContainer: {
-    backgroundColor: colors.army900,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: "700",
   },
 });
 

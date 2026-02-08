@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { Card, PrimaryButton } from "@/src/components/ui";
 import { submitSuggestion } from "@/src/lib/suggestionsApi";
 import { colors } from "@/src/theme/tokens";
@@ -84,90 +85,92 @@ export default function SuggestionScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Card style={styles.formCard}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="chatbox-outline" size={18} color={colors.army600} />
-        </View>
-        <Text style={styles.title}>Enviar Sugestao</Text>
-        <Text style={styles.subtitle}>Encontrou um erro ou tem uma ideia de bizu? Envie para nos.</Text>
+    <Screen edges={["left", "right"]}>
+      <View style={styles.container}>
+        <Card style={styles.formCard}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="chatbox-outline" size={18} color={colors.army600} />
+          </View>
+          <Text style={styles.title}>Enviar Sugestao</Text>
+          <Text style={styles.subtitle}>Encontrou um erro ou tem uma ideia de bizu? Envie para nos.</Text>
 
-        <Text style={styles.label}>Categoria</Text>
-        <View style={styles.categoryList}>
-          {CATEGORY_OPTIONS.map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.categoryButton, category === option ? styles.categoryButtonSelected : null]}
-              onPress={() => handleCategoryPress(option)}
-            >
-              <Text
-                style={[
-                  styles.categoryButtonText,
-                  category === option ? styles.categoryButtonTextSelected : null,
-                ]}
+          <Text style={styles.label}>Categoria</Text>
+          <View style={styles.categoryList}>
+            {CATEGORY_OPTIONS.map((option) => (
+              <Pressable
+                key={option}
+                style={[styles.categoryButton, category === option ? styles.categoryButtonSelected : null]}
+                onPress={() => handleCategoryPress(option)}
               >
-                {option}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Seu email (opcional)</Text>
-        <TextInput
-          value={contact}
-          onChangeText={handleChangeContact}
-          placeholder="Seu email para retorno"
-          placeholderTextColor={colors.gray500}
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={200}
-        />
-
-        <Text style={styles.label}>Sua sugestao</Text>
-        <TextInput
-          value={message}
-          onChangeText={handleChangeMessage}
-          placeholder="Descreva sua sugestao, correcao ou novo bizu..."
-          placeholderTextColor={colors.gray500}
-          style={styles.textarea}
-          multiline
-          textAlignVertical="top"
-          maxLength={MESSAGE_MAX}
-        />
-
-        <Text style={styles.counter}>
-          {messageLength}/{MESSAGE_MAX}
-        </Text>
-
-        <PrimaryButton
-          label={isSubmitting ? "Enviando..." : "Enviar Colaboracao"}
-          onPress={() => void handleSubmit()}
-          disabled={!isMessageValid || isSubmitting}
-        />
-
-        <Text style={styles.footnote}>Sua sugestao sera revisada pela administracao antes de ser publicada.</Text>
-      </Card>
-
-      {submitState === "sent" ? (
-        <Card style={styles.feedbackCard}>
-          <View style={styles.feedbackRow}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.army600} />
-            <Text style={styles.feedbackText}>Sugestao enviada com sucesso.</Text>
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    category === option ? styles.categoryButtonTextSelected : null,
+                  ]}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
           </View>
-        </Card>
-      ) : null}
 
-      {submitState === "error" ? (
-        <Card style={styles.feedbackCard}>
-          <View style={styles.feedbackRow}>
-            <Ionicons name="alert-circle" size={18} color={colors.pdfPrimary} />
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </View>
+          <Text style={styles.label}>Seu email (opcional)</Text>
+          <TextInput
+            value={contact}
+            onChangeText={handleChangeContact}
+            placeholder="Seu email para retorno"
+            placeholderTextColor={colors.gray500}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={200}
+          />
+
+          <Text style={styles.label}>Sua sugestao</Text>
+          <TextInput
+            value={message}
+            onChangeText={handleChangeMessage}
+            placeholder="Descreva sua sugestao, correcao ou novo bizu..."
+            placeholderTextColor={colors.gray500}
+            style={styles.textarea}
+            multiline
+            textAlignVertical="top"
+            maxLength={MESSAGE_MAX}
+          />
+
+          <Text style={styles.counter}>
+            {messageLength}/{MESSAGE_MAX}
+          </Text>
+
+          <PrimaryButton
+            label={isSubmitting ? "Enviando..." : "Enviar Colaboracao"}
+            onPress={() => void handleSubmit()}
+            disabled={!isMessageValid || isSubmitting}
+          />
+
+          <Text style={styles.footnote}>Sua sugestao sera revisada pela administracao antes de ser publicada.</Text>
         </Card>
-      ) : null}
-    </View>
+
+        {submitState === "sent" ? (
+          <Card style={styles.feedbackCard}>
+            <View style={styles.feedbackRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.army600} />
+              <Text style={styles.feedbackText}>Sugestao enviada com sucesso.</Text>
+            </View>
+          </Card>
+        ) : null}
+
+        {submitState === "error" ? (
+          <Card style={styles.feedbackCard}>
+            <View style={styles.feedbackRow}>
+              <Ionicons name="alert-circle" size={18} color={colors.pdfPrimary} />
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          </Card>
+        ) : null}
+      </View>
+    </Screen>
   );
 }
 

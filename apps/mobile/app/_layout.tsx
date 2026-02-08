@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CatalogProvider } from "@/src/state/catalogContext";
 import { PillBadge } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
@@ -6,9 +7,11 @@ import { colors } from "@/src/theme/tokens";
 
 export default function RootLayout() {
   return (
-    <CatalogProvider>
-      <AppStack />
-    </CatalogProvider>
+    <SafeAreaProvider>
+      <CatalogProvider>
+        <AppStack />
+      </CatalogProvider>
+    </SafeAreaProvider>
   );
 }
 

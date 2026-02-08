@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { Card, ContentListItem, OutlineButton, PillBadge, PrimaryButton, SearchBar } from "@/src/components/ui";
 import {
   createBatchController,
@@ -145,115 +146,120 @@ export default function CategoryItemsScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        placeholder={`Buscar em ${category?.name ?? "Categoria"}...`}
-      />
+    <Screen edges={["left", "right"]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder={`Buscar em ${category?.name ?? "Categoria"}...`}
+        />
 
-      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
-      {!loadingCache && !category ? (
-        <Card>
-          <Text style={styles.emptyText}>Categoria nao encontrada no cache.</Text>
-        </Card>
-      ) : null}
+        {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
+        {!loadingCache && !category ? (
+          <Card>
+            <Text style={styles.emptyText}>Categoria nao encontrada no cache.</Text>
+          </Card>
+        ) : null}
 
-      {!loadingCache && category ? (
-        <Card style={styles.batchCard}>
-          <Text style={styles.batchTitle}>Acoes da categoria</Text>
-          <Text style={styles.metaText}>
-            Elegiveis para download: {categoryMediaItems.length} | Ja baixados: {categoryDownloadedCount}
-          </Text>
+        {!loadingCache && category ? (
+          <Card style={styles.batchCard}>
+            <Text style={styles.batchTitle}>Acoes da categoria</Text>
+            <Text style={styles.metaText}>
+              Elegiveis para download: {categoryMediaItems.length} | Ja baixados: {categoryDownloadedCount}
+            </Text>
 
-          <View style={styles.actionsRow}>
-            <PrimaryButton
-              label="Baixar categoria"
-              onPress={() => void handleDownloadCategory()}
-              disabled={!categoryMediaItems.length || running}
-              style={styles.actionButton}
-            />
-            <OutlineButton
-              label="Remover downloads"
-              onPress={() => void handleRemoveCategoryDownloads()}
-              disabled={!categoryDownloadedCount || running}
-              style={styles.actionButton}
-            />
-            {running ? (
-              <OutlineButton
-                label="Cancelar"
-                onPress={handleCancelBatch}
-                compact
-                style={styles.cancelButton}
+            <View style={styles.actionsRow}>
+              <PrimaryButton
+                label="Baixar categoria"
+                onPress={() => void handleDownloadCategory()}
+                disabled={!categoryMediaItems.length || running}
+                style={styles.actionButton}
               />
-            ) : null}
-          </View>
-
-          {batchProgress ? (
-            <>
-              <Text style={styles.metaText}>
-                {batchProgress.mode === "download" ? "Baixando" : "Removendo"} {progressCount}/{batchProgress.total}
-              </Text>
-              {batchProgress.currentItemTitle ? (
-                <Text style={styles.metaText}>Item atual: {truncate(batchProgress.currentItemTitle, 48)}</Text>
+              <OutlineButton
+                label="Remover downloads"
+                onPress={() => void handleRemoveCategoryDownloads()}
+                disabled={!categoryDownloadedCount || running}
+                style={styles.actionButton}
+              />
+              {running ? (
+                <OutlineButton
+                  label="Cancelar"
+                  onPress={handleCancelBatch}
+                  compact
+                  style={styles.cancelButton}
+                />
               ) : null}
-            </>
-          ) : null}
-
-          {batchStatus !== "idle" ? <Text style={styles.metaText}>Estado: {statusLabel(batchStatus)}</Text> : null}
-          {batchMessage ? (
-            <View style={styles.batchMessageBox}>
-              <Text style={styles.batchMessage}>{batchMessage}</Text>
             </View>
-          ) : null}
-        </Card>
-      ) : null}
 
-      {!loadingCache && category && filteredItems.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>Nenhum item encontrado com esse filtro.</Text>
-        </Card>
-      ) : null}
+            {batchProgress ? (
+              <>
+                <Text style={styles.metaText}>
+                  {batchProgress.mode === "download" ? "Baixando" : "Removendo"} {progressCount}/{batchProgress.total}
+                </Text>
+                {batchProgress.currentItemTitle ? (
+                  <Text style={styles.metaText}>Item atual: {truncate(batchProgress.currentItemTitle, 48)}</Text>
+                ) : null}
+              </>
+            ) : null}
 
-      {!loadingCache && category
-        ? filteredItems.map((item) => (
-            <ContentListItem
-              key={item.id}
-              type={item.type as ContentType}
-              title={item.title}
-              subtitle={item.description ?? item.type}
-              onPress={() =>
-                router.push({
-                  pathname: "/item/[id]",
-                  params: { id: item.id },
-                })
-              }
-              trailing={
-                <View style={styles.trailingWrap}>
-                  {item.type !== "text" && downloadedMap[item.id] ? (
-                    <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
-                  ) : null}
-                  <Pressable
-                    style={styles.favoriteIconButton}
-                    onPress={() => void handleToggleFavorite(item.id)}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={isFavorite(item.id) ? "star" : "star-outline"}
-                      size={18}
-                      color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
-                    />
-                  </Pressable>
-                </View>
-              }
-            />
-          ))
-        : null}
-    </ScrollView>
+            {batchStatus !== "idle" ? <Text style={styles.metaText}>Estado: {statusLabel(batchStatus)}</Text> : null}
+            {batchMessage ? (
+              <View style={styles.batchMessageBox}>
+                <Text style={styles.batchMessage}>{batchMessage}</Text>
+              </View>
+            ) : null}
+          </Card>
+        ) : null}
+
+        {!loadingCache && category && filteredItems.length === 0 ? (
+          <Card>
+            <Text style={styles.emptyText}>Nenhum item encontrado com esse filtro.</Text>
+          </Card>
+        ) : null}
+
+        {!loadingCache && category
+          ? filteredItems.map((item) => (
+              <ContentListItem
+                key={item.id}
+                type={item.type as ContentType}
+                title={item.title}
+                subtitle={item.description ?? item.type}
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item.id },
+                  })
+                }
+                trailing={
+                  <View style={styles.trailingWrap}>
+                    {item.type !== "text" && downloadedMap[item.id] ? (
+                      <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
+                    ) : null}
+                    <Pressable
+                      style={styles.favoriteIconButton}
+                      onPress={() => void handleToggleFavorite(item.id)}
+                      hitSlop={8}
+                    >
+                      <Ionicons
+                        name={isFavorite(item.id) ? "star" : "star-outline"}
+                        size={18}
+                        color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                      />
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))
+          : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+  },
   container: {
     padding: 16,
     gap: 12,

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors, type ContentType } from "@/src/theme/tokens";
@@ -56,118 +57,123 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onSubmitEditing={openSearch}
-        onFocus={openSearch}
-        placeholder="Buscar bizu, cancao..."
-        returnKeyType="search"
-      />
+    <Screen edges={["left", "right"]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={openSearch}
+          onFocus={openSearch}
+          placeholder="Buscar bizu, cancao..."
+          returnKeyType="search"
+        />
 
-      <Text style={styles.sectionTitle}>Categorias</Text>
-      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
+        <Text style={styles.sectionTitle}>Categorias</Text>
+        {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
-      {!loadingCache && categories.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>Sem categorias no cache. Use "Sincronizar agora" na rota Admin.</Text>
-        </View>
-      ) : null}
+        {!loadingCache && categories.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Sem categorias no cache. Use "Sincronizar agora" na rota Admin.</Text>
+          </View>
+        ) : null}
 
-      <View style={styles.grid}>
-        {!loadingCache
-          ? categories.map((category) => {
-              const stat = categoryStats.get(category.id) ?? { total: 0, offline: 0 };
-              return (
-                <Pressable
-                  key={category.id}
-                  style={styles.gridItem}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/category/[id]",
-                      params: { id: category.id },
-                    })
-                  }
-                >
-                  {({ pressed }) => (
-                    <View style={[styles.categoryCard, pressed ? styles.categoryCardPressed : null]}>
-                      <View style={styles.categoryIconCircle}>
-                        <Ionicons name="book-outline" size={18} color={colors.army600} />
+        <View style={styles.grid}>
+          {!loadingCache
+            ? categories.map((category) => {
+                const stat = categoryStats.get(category.id) ?? { total: 0, offline: 0 };
+                return (
+                  <Pressable
+                    key={category.id}
+                    style={styles.gridItem}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/category/[id]",
+                        params: { id: category.id },
+                      })
+                    }
+                  >
+                    {({ pressed }) => (
+                      <View style={[styles.categoryCard, pressed ? styles.categoryCardPressed : null]}>
+                        <View style={styles.categoryIconCircle}>
+                          <Ionicons name="book-outline" size={18} color={colors.army600} />
+                        </View>
+                        <Text style={styles.categoryTitle} numberOfLines={2}>
+                          {category.name}
+                        </Text>
+                        <Text style={styles.categoryCount}>{stat.total} itens</Text>
+                        {stat.offline > 0 ? (
+                          <PillBadge
+                            label={`${stat.offline} offline`}
+                            tone="success"
+                            style={styles.categoryOfflineBadge}
+                          />
+                        ) : null}
                       </View>
-                      <Text style={styles.categoryTitle} numberOfLines={2}>
-                        {category.name}
-                      </Text>
-                      <Text style={styles.categoryCount}>{stat.total} itens</Text>
-                      {stat.offline > 0 ? (
-                        <PillBadge
-                          label={`${stat.offline} offline`}
-                          tone="success"
-                          style={styles.categoryOfflineBadge}
-                        />
-                      ) : null}
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })
-          : null}
-      </View>
-
-      {!loadingBizu && bizuOfTheDay ? (
-        <View style={styles.bizuCard}>
-          <Text style={styles.bizuLabel}>Bizu do Dia</Text>
-          <Text style={styles.bizuTitle} numberOfLines={2}>
-            {bizuOfTheDay.title}
-          </Text>
-          <Text style={styles.bizuMeta} numberOfLines={2}>
-            {bizuOfTheDay.description ?? "Bizu em destaque para consulta rapida."}
-          </Text>
-          <Pressable
-            style={styles.bizuButton}
-            onPress={() =>
-              router.push({
-                pathname: "/item/[id]",
-                params: { id: bizuOfTheDay.id },
+                    )}
+                  </Pressable>
+                );
               })
-            }
-          >
-            <Text style={styles.bizuButtonText}>Ler agora</Text>
-          </Pressable>
+            : null}
         </View>
-      ) : null}
 
-      {!loadingCache && recentItems.length > 0 ? <Text style={styles.sectionTitle}>Acesso rapido</Text> : null}
-      {!loadingCache
-        ? recentItems.map((item) => (
-            <ContentListItem
-              key={item.id}
-              type={item.type as ContentType}
-              title={item.title}
-              subtitle={item.description ?? item.type}
+        {!loadingBizu && bizuOfTheDay ? (
+          <View style={styles.bizuCard}>
+            <Text style={styles.bizuLabel}>Bizu do Dia</Text>
+            <Text style={styles.bizuTitle} numberOfLines={2}>
+              {bizuOfTheDay.title}
+            </Text>
+            <Text style={styles.bizuMeta} numberOfLines={2}>
+              {bizuOfTheDay.description ?? "Bizu em destaque para consulta rapida."}
+            </Text>
+            <Pressable
+              style={styles.bizuButton}
               onPress={() =>
                 router.push({
                   pathname: "/item/[id]",
-                  params: { id: item.id },
+                  params: { id: bizuOfTheDay.id },
                 })
               }
-              trailing={
-                <Pressable onPress={() => void handleToggleFavorite(item.id)} hitSlop={8}>
-                  <Ionicons
-                    name={isFavorite(item.id) ? "star" : "star-outline"}
-                    size={18}
-                    color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
-                  />
-                </Pressable>
-              }
-            />
-          ))
-        : null}
-    </ScrollView>
+            >
+              <Text style={styles.bizuButtonText}>Ler agora</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!loadingCache && recentItems.length > 0 ? <Text style={styles.sectionTitle}>Acesso rapido</Text> : null}
+        {!loadingCache
+          ? recentItems.map((item) => (
+              <ContentListItem
+                key={item.id}
+                type={item.type as ContentType}
+                title={item.title}
+                subtitle={item.description ?? item.type}
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item.id },
+                  })
+                }
+                trailing={
+                  <Pressable onPress={() => void handleToggleFavorite(item.id)} hitSlop={8}>
+                    <Ionicons
+                      name={isFavorite(item.id) ? "star" : "star-outline"}
+                      size={18}
+                      color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                    />
+                  </Pressable>
+                }
+              />
+            ))
+          : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+  },
   container: {
     padding: 16,
     gap: 12,

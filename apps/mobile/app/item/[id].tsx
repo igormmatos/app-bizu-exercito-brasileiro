@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
 import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "@/src/lib/downloadManager";
@@ -205,127 +206,132 @@ export default function ItemDetailScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
+    <Screen edges={["left", "right"]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+        {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
-      {!loadingCache && !item ? (
-        <Card>
-          <Text style={styles.metaText}>Item nao encontrado no cache.</Text>
-        </Card>
-      ) : null}
+        {!loadingCache && !item ? (
+          <Card>
+            <Text style={styles.metaText}>Item nao encontrado no cache.</Text>
+          </Card>
+        ) : null}
 
-      {!loadingCache && item ? (
-        <>
-          <View style={styles.topActions}>
-            <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite()}>
-              <Ionicons
-                name={isFavorite(item.id) ? "star" : "star-outline"}
-                size={17}
-                color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
-              />
-              <Text style={styles.favoriteText}>{isFavorite(item.id) ? "Favoritado" : "Favoritar"}</Text>
-            </Pressable>
-          </View>
-
-          {item.type !== "text" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
-
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.subtitle} numberOfLines={2}>
-            {item.description ?? "Sem descricao cadastrada."}
-          </Text>
-
-          {item.type === "pdf" ? (
-            <PrimaryButton
-              label="Ler Documento (PDF)"
-              onPress={() => void handleOpenPreferred()}
-              disabled={busy}
-            />
-          ) : null}
-
-          {item.type === "image" ? (
-            <PrimaryButton
-              label="Visualizar Imagem Ampliada"
-              onPress={() => void handleOpenPreferred()}
-              disabled={busy}
-            />
-          ) : null}
-
-          {item.type === "audio" ? (
-            <Card style={styles.audioCard}>
-              <Pressable
-                style={({ pressed }) => [styles.playCircle, pressed ? styles.playCirclePressed : null]}
-                onPress={() => void handleAudioPlayPause()}
-                disabled={audioBusy}
-              >
+        {!loadingCache && item ? (
+          <>
+            <View style={styles.topActions}>
+              <Pressable style={styles.favoriteButton} onPress={() => void handleToggleFavorite()}>
                 <Ionicons
-                  name={audioStatus.playing ? "pause" : "play"}
-                  size={26}
-                  color={colors.white}
-                  style={styles.playIcon}
+                  name={isFavorite(item.id) ? "star" : "star-outline"}
+                  size={17}
+                  color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
                 />
+                <Text style={styles.favoriteText}>{isFavorite(item.id) ? "Favoritado" : "Favoritar"}</Text>
               </Pressable>
+            </View>
 
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, audioProgress)) * 100}%` }]} />
-              </View>
+            {item.type !== "text" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
 
-              <View style={styles.timeRow}>
-                <Text style={styles.timeText}>{formatSeconds(audioCurrentTime)}</Text>
-                <Text style={styles.timeText}>{formatSeconds(audioDuration)}</Text>
-              </View>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.subtitle} numberOfLines={2}>
+              {item.description ?? "Sem descricao cadastrada."}
+            </Text>
 
-              <View style={styles.lyricsBox}>
-                <Text style={styles.lyricsLabel}>LETRA DA CANCAO</Text>
-                <ScrollView nestedScrollEnabled style={styles.lyricsScroll}>
-                  <Text style={styles.lyricsText}>{lyricsText}</Text>
-                </ScrollView>
-              </View>
-            </Card>
-          ) : null}
+            {item.type === "pdf" ? (
+              <PrimaryButton
+                label="Ler Documento (PDF)"
+                onPress={() => void handleOpenPreferred()}
+                disabled={busy}
+              />
+            ) : null}
 
-          {item.type === "text" ? (
-            <Card>
-              <Text style={styles.textBody}>{item.text_body ?? "Sem conteudo textual."}</Text>
-            </Card>
-          ) : null}
+            {item.type === "image" ? (
+              <PrimaryButton
+                label="Visualizar Imagem Ampliada"
+                onPress={() => void handleOpenPreferred()}
+                disabled={busy}
+              />
+            ) : null}
 
-          {isMediaItem ? (
-            <Card>
-              <View style={styles.offlineHeader}>
-                <Text style={styles.offlineTitle}>Disponibilidade Offline</Text>
-                <Text style={styles.offlineSize}>{offlineSizeLabel}</Text>
-              </View>
+            {item.type === "audio" ? (
+              <Card style={styles.audioCard}>
+                <Pressable
+                  style={({ pressed }) => [styles.playCircle, pressed ? styles.playCirclePressed : null]}
+                  onPress={() => void handleAudioPlayPause()}
+                  disabled={audioBusy}
+                >
+                  <Ionicons
+                    name={audioStatus.playing ? "pause" : "play"}
+                    size={26}
+                    color={colors.white}
+                    style={styles.playIcon}
+                  />
+                </Pressable>
 
-              {!isDownloaded ? (
-                <OutlineButton
-                  label={busy ? "Baixando..." : "Baixar para Offline"}
-                  onPress={() => void handleDownload()}
-                  disabled={busy}
-                />
-              ) : (
-                <OutlineButton
-                  label={busy ? "Removendo..." : "Remover download"}
-                  onPress={() => void handleRemoveDownload()}
-                  disabled={busy}
-                />
-              )}
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, audioProgress)) * 100}%` }]} />
+                </View>
 
-              <OutlineButton label="Abrir remoto" onPress={() => void handleOpenRemote()} disabled={busy} />
-            </Card>
-          ) : null}
+                <View style={styles.timeRow}>
+                  <Text style={styles.timeText}>{formatSeconds(audioCurrentTime)}</Text>
+                  <Text style={styles.timeText}>{formatSeconds(audioDuration)}</Text>
+                </View>
 
-          {message ? (
-            <Card>
-              <Text style={styles.message}>{message}</Text>
-            </Card>
-          ) : null}
-        </>
-      ) : null}
-    </ScrollView>
+                <View style={styles.lyricsBox}>
+                  <Text style={styles.lyricsLabel}>LETRA DA CANCAO</Text>
+                  <ScrollView nestedScrollEnabled style={styles.lyricsScroll}>
+                    <Text style={styles.lyricsText}>{lyricsText}</Text>
+                  </ScrollView>
+                </View>
+              </Card>
+            ) : null}
+
+            {item.type === "text" ? (
+              <Card>
+                <Text style={styles.textBody}>{item.text_body ?? "Sem conteudo textual."}</Text>
+              </Card>
+            ) : null}
+
+            {isMediaItem ? (
+              <Card>
+                <View style={styles.offlineHeader}>
+                  <Text style={styles.offlineTitle}>Disponibilidade Offline</Text>
+                  <Text style={styles.offlineSize}>{offlineSizeLabel}</Text>
+                </View>
+
+                {!isDownloaded ? (
+                  <OutlineButton
+                    label={busy ? "Baixando..." : "Baixar para Offline"}
+                    onPress={() => void handleDownload()}
+                    disabled={busy}
+                  />
+                ) : (
+                  <OutlineButton
+                    label={busy ? "Removendo..." : "Remover download"}
+                    onPress={() => void handleRemoveDownload()}
+                    disabled={busy}
+                  />
+                )}
+
+                <OutlineButton label="Abrir remoto" onPress={() => void handleOpenRemote()} disabled={busy} />
+              </Card>
+            ) : null}
+
+            {message ? (
+              <Card>
+                <Text style={styles.message}>{message}</Text>
+              </Card>
+            ) : null}
+          </>
+        ) : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+  },
   container: {
     padding: 16,
     gap: 12,

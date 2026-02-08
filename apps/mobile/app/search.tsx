@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { Card, ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { normalize, searchCatalogIndex } from "@/src/lib/searchIndex";
 import { useCatalog } from "@/src/state/catalogContext";
@@ -34,71 +35,73 @@ export default function SearchScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Buscar bizu, cancao..."
-        returnKeyType="search"
-        autoFocus={typeof q === "string" && q.length > 0}
-      />
+    <Screen edges={["left", "right"]}>
+      <View style={styles.container}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar bizu, cancao..."
+          returnKeyType="search"
+          autoFocus={typeof q === "string" && q.length > 0}
+        />
 
-      {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
+        {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
-      {!loadingCache && items.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>Sem itens no cache. Execute a sincronizacao na rota Admin.</Text>
-        </Card>
-      ) : null}
+        {!loadingCache && items.length === 0 ? (
+          <Card>
+            <Text style={styles.emptyText}>Sem itens no cache. Execute a sincronizacao na rota Admin.</Text>
+          </Card>
+        ) : null}
 
-      {!loadingCache && items.length > 0 ? (
-        <Text style={styles.resultCount}>
-          {rankedResults.length} resultado(s)
-          {normalizedQuery ? ` para "${query}"` : " (top 50)"}
-        </Text>
-      ) : null}
+        {!loadingCache && items.length > 0 ? (
+          <Text style={styles.resultCount}>
+            {rankedResults.length} resultado(s)
+            {normalizedQuery ? ` para "${query}"` : " (top 50)"}
+          </Text>
+        ) : null}
 
-      {!loadingCache && items.length > 0 && rankedResults.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>Nenhum resultado para "{query}".</Text>
-        </Card>
-      ) : null}
+        {!loadingCache && items.length > 0 && rankedResults.length === 0 ? (
+          <Card>
+            <Text style={styles.emptyText}>Nenhum resultado para "{query}".</Text>
+          </Card>
+        ) : null}
 
-      {!loadingCache
-        ? rankedResults.map(({ item }) => (
-            <ContentListItem
-              key={item.id}
-              type={item.type as ContentType}
-              title={item.title}
-              subtitle={item.description ?? item.type}
-              onPress={() =>
-                router.push({
-                  pathname: "/item/[id]",
-                  params: { id: item.id },
-                })
-              }
-              trailing={
-                <View style={styles.trailingWrap}>
-                  {item.type !== "text" && downloadedMap[item.id] ? (
-                    <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
-                  ) : null}
-                  <Pressable
-                    style={styles.favoriteIconButton}
-                    onPress={() => void handleToggleFavorite(item.id)}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={isFavorite(item.id) ? "star" : "star-outline"}
-                      size={18}
-                      color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
-                    />
-                  </Pressable>
-                </View>
-              }
-            />
-          ))
-        : null}
-    </View>
+        {!loadingCache
+          ? rankedResults.map(({ item }) => (
+              <ContentListItem
+                key={item.id}
+                type={item.type as ContentType}
+                title={item.title}
+                subtitle={item.description ?? item.type}
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item.id },
+                  })
+                }
+                trailing={
+                  <View style={styles.trailingWrap}>
+                    {item.type !== "text" && downloadedMap[item.id] ? (
+                      <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
+                    ) : null}
+                    <Pressable
+                      style={styles.favoriteIconButton}
+                      onPress={() => void handleToggleFavorite(item.id)}
+                      hitSlop={8}
+                    >
+                      <Ionicons
+                        name={isFavorite(item.id) ? "star" : "star-outline"}
+                        size={18}
+                        color={isFavorite(item.id) ? "#F59E0B" : colors.gray500}
+                      />
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))
+          : null}
+      </View>
+    </Screen>
   );
 }
 

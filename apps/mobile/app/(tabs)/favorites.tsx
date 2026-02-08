@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Screen } from "@/src/components/layout";
 import { Card, ContentListItem } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
 import { type ContentType, colors } from "@/src/theme/tokens";
@@ -27,42 +28,44 @@ export default function FavoritesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {loadingCache || loadingFavorites ? <Text style={styles.metaText}>Carregando favoritos...</Text> : null}
+    <Screen edges={["left", "right"]}>
+      <View style={styles.container}>
+        {loadingCache || loadingFavorites ? <Text style={styles.metaText}>Carregando favoritos...</Text> : null}
 
-      {!loadingCache && !loadingFavorites && favoriteItems.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Nenhum favorito ainda</Text>
-          <Text style={styles.emptyText}>Voce ainda nao favoritou nenhum item.</Text>
-        </Card>
-      ) : null}
+        {!loadingCache && !loadingFavorites && favoriteItems.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Nenhum favorito ainda</Text>
+            <Text style={styles.emptyText}>Voce ainda nao favoritou nenhum item.</Text>
+          </Card>
+        ) : null}
 
-      {!loadingCache && !loadingFavorites
-        ? favoriteItems.map((item) => (
-            <ContentListItem
-              key={item.id}
-              type={item.type as ContentType}
-              title={item.title}
-              subtitle={item.description ?? item.type}
-              onPress={() =>
-                router.push({
-                  pathname: "/item/[id]",
-                  params: { id: item.id },
-                })
-              }
-              trailing={
-                <Pressable
-                  style={styles.favoriteIconButton}
-                  onPress={() => void handleToggleFavorite(item.id)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="star" size={18} color="#F59E0B" />
-                </Pressable>
-              }
-            />
-          ))
-        : null}
-    </View>
+        {!loadingCache && !loadingFavorites
+          ? favoriteItems.map((item) => (
+              <ContentListItem
+                key={item.id}
+                type={item.type as ContentType}
+                title={item.title}
+                subtitle={item.description ?? item.type}
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/[id]",
+                    params: { id: item.id },
+                  })
+                }
+                trailing={
+                  <Pressable
+                    style={styles.favoriteIconButton}
+                    onPress={() => void handleToggleFavorite(item.id)}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="star" size={18} color="#F59E0B" />
+                  </Pressable>
+                }
+              />
+            ))
+          : null}
+      </View>
+    </Screen>
   );
 }
 
