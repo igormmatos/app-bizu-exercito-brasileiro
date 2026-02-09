@@ -175,10 +175,10 @@ export function CategoryManager() {
             </div>
 
             {!category.published ? (
-              <div className="draft-note">Rascunho (Invisivel no App)</div>
+              <div className="draft-note">Rascunho (Invisível no App)</div>
             ) : null}
 
-            <p className="text-muted">Ordem de exibicao: {category.sort_order}</p>
+            <p className="text-muted">Ordem de exibição: {category.sort_order}</p>
             <p className="text-muted">Itens vinculados: {itemsByCategory.get(category.id) ?? 0}</p>
             <p className="text-muted">Atualizado em: {formatDate(category.updated_at)}</p>
 

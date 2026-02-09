@@ -82,7 +82,7 @@ export default function CategoryItemsScreen() {
       }
 
       setBatchStatus("idle");
-      setBatchMessage(`Download da categoria concluido: ${result.okCount} item(ns).`);
+      setBatchMessage(`Download da categoria concluído: ${result.okCount} item(ns).`);
     } catch (error) {
       if (isBatchCancelledError(error)) {
         setBatchStatus("cancelled");
@@ -123,7 +123,7 @@ export default function CategoryItemsScreen() {
     } catch (error) {
       if (isBatchCancelledError(error)) {
         setBatchStatus("cancelled");
-        setBatchMessage("Remocao em lote cancelada.");
+        setBatchMessage("Remoção em lote cancelada.");
       } else {
         setBatchStatus("error");
         setBatchMessage(toMessage(error, "Falha ao remover downloads da categoria."));
@@ -157,15 +157,15 @@ export default function CategoryItemsScreen() {
         {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
         {!loadingCache && !category ? (
           <Card>
-            <Text style={styles.emptyText}>Categoria nao encontrada no cache.</Text>
+            <Text style={styles.emptyText}>Categoria não encontrada no cache.</Text>
           </Card>
         ) : null}
 
         {!loadingCache && category ? (
           <Card style={styles.batchCard}>
-            <Text style={styles.batchTitle}>Acoes da categoria</Text>
+            <Text style={styles.batchTitle}>Ações da categoria</Text>
             <Text style={styles.metaText}>
-              Elegiveis para download: {categoryMediaItems.length} | Ja baixados: {categoryDownloadedCount}
+              Elegíveis para download: {categoryMediaItems.length} | Já baixados: {categoryDownloadedCount}
             </Text>
 
             <View style={styles.actionsRow}>

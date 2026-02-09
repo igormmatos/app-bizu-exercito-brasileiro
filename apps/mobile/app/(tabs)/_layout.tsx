@@ -50,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="suggestion"
         options={{
-          title: "Sugestao",
+          title: "Sugestão",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-ellipses" size={size} color={color} />
           ),
@@ -79,6 +79,6 @@ const styles = StyleSheet.create({
 
 function titleByRoute(routeName: string): string {
   if (routeName === "favorites") return "Meus Favoritos";
-  if (routeName === "suggestion") return "Colaboracao";
+  if (routeName === "suggestion") return "Colaboração";
   return "Bizus EB";
 }

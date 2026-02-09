@@ -24,7 +24,7 @@ type DownloadableItem = CatalogItem & {
 
 class BatchCancelledError extends Error {
   constructor() {
-    super("Operacao em lote cancelada.");
+    super("Operação em lote cancelada.");
     this.name = "BatchCancelledError";
   }
 }

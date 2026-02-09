@@ -40,7 +40,7 @@ export default function SearchScreen() {
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          placeholder="Buscar bizu, cancao..."
+          placeholder="Buscar bizu, canção..."
           returnKeyType="search"
           autoFocus={typeof q === "string" && q.length > 0}
         />
@@ -49,7 +49,7 @@ export default function SearchScreen() {
 
         {!loadingCache && items.length === 0 ? (
           <Card>
-            <Text style={styles.emptyText}>Sem itens no cache. Execute a sincronizacao na rota Admin.</Text>
+            <Text style={styles.emptyText}>Sem itens no cache. Execute a sincronização na rota Admin.</Text>
           </Card>
         ) : null}
 

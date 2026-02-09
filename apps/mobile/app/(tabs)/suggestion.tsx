@@ -8,7 +8,7 @@ import { submitSuggestion } from "@/src/lib/suggestionsApi";
 import { colors } from "@/src/theme/tokens";
 
 const MESSAGE_MAX = 2000;
-const CATEGORY_OPTIONS = ["Conteudo", "Bug", "UX", "Outro"] as const;
+const CATEGORY_OPTIONS = ["Conteúdo", "Bug", "UX", "Outro"] as const;
 
 type SubmitState = "idle" | "loading" | "sent" | "error";
 
@@ -36,12 +36,12 @@ export default function SuggestionScreen() {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
       setSubmitState("error");
-      setErrorMessage("Mensagem obrigatoria.");
+      setErrorMessage("Mensagem obrigatória.");
       return;
     }
     if (trimmedMessage.length > MESSAGE_MAX) {
       setSubmitState("error");
-      setErrorMessage("A mensagem pode ter no maximo 2000 caracteres.");
+      setErrorMessage("A mensagem pode ter no máximo 2000 caracteres.");
       return;
     }
 
@@ -65,7 +65,7 @@ export default function SuggestionScreen() {
       setSubmitState("sent");
     } catch {
       setSubmitState("error");
-      setErrorMessage("Nao foi possivel enviar. Verifique sua conexao.");
+      setErrorMessage("Não foi possível enviar. Verifique sua conexão.");
     }
   }
 
@@ -91,8 +91,8 @@ export default function SuggestionScreen() {
           <View style={styles.iconCircle}>
             <Ionicons name="chatbox-outline" size={18} color={colors.army600} />
           </View>
-          <Text style={styles.title}>Enviar Sugestao</Text>
-          <Text style={styles.subtitle}>Encontrou um erro ou tem uma ideia de bizu? Envie para nos.</Text>
+          <Text style={styles.title}>Enviar Sugestão</Text>
+          <Text style={styles.subtitle}>Encontrou um erro ou tem uma ideia de bizu? Envie para nós.</Text>
 
           <Text style={styles.label}>Categoria</Text>
           <View style={styles.categoryList}>
@@ -127,11 +127,11 @@ export default function SuggestionScreen() {
             maxLength={200}
           />
 
-          <Text style={styles.label}>Sua sugestao</Text>
+          <Text style={styles.label}>Sua sugestão</Text>
           <TextInput
             value={message}
             onChangeText={handleChangeMessage}
-            placeholder="Descreva sua sugestao, correcao ou novo bizu..."
+            placeholder="Descreva sua sugestão, correção ou novo bizu..."
             placeholderTextColor={colors.gray500}
             style={styles.textarea}
             multiline
@@ -144,19 +144,19 @@ export default function SuggestionScreen() {
           </Text>
 
           <PrimaryButton
-            label={isSubmitting ? "Enviando..." : "Enviar Colaboracao"}
+            label={isSubmitting ? "Enviando..." : "Enviar Colaboração"}
             onPress={() => void handleSubmit()}
             disabled={!isMessageValid || isSubmitting}
           />
 
-          <Text style={styles.footnote}>Sua sugestao sera revisada pela administracao antes de ser publicada.</Text>
+          <Text style={styles.footnote}>Sua sugestão será revisada pela administração antes de ser publicada.</Text>
         </Card>
 
         {submitState === "sent" ? (
           <Card style={styles.feedbackCard}>
             <View style={styles.feedbackRow}>
               <Ionicons name="checkmark-circle" size={18} color={colors.army600} />
-              <Text style={styles.feedbackText}>Sugestao enviada com sucesso.</Text>
+              <Text style={styles.feedbackText}>Sugestão enviada com sucesso.</Text>
             </View>
           </Card>
         ) : null}

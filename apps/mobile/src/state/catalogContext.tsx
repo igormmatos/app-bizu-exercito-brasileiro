@@ -161,10 +161,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       setLastSyncAt(result.lastSyncAt);
       await syncBizuOfTheDay(result.items);
       setMessage(
-        `Sincronizacao concluida: ${result.categories.length} categorias e ${result.items.length} itens.`,
+        `Sincronização concluída: ${result.categories.length} categorias e ${result.items.length} itens.`,
       );
     } catch (error) {
-      setMessage(toMessage(error, "Falha no sync do catalogo."));
+      setMessage(toMessage(error, "Falha no sync do catálogo."));
       throw error;
     } finally {
       setSyncing(false);

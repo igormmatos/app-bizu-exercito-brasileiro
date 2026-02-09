@@ -34,7 +34,7 @@ export default function PdfViewerScreen() {
 
     async function setup() {
       if (!pdfUri) {
-        throw new Error("Parametro 'uri' nao informado.");
+        throw new Error("Parâmetro 'uri' não informado.");
       }
 
       setLoading(true);
@@ -112,7 +112,7 @@ export default function PdfViewerScreen() {
     if (payload.type === "loading") {
       setLoading(true);
       if (payload.total > 0) {
-        setPageInfo(`Pagina ${payload.page}/${payload.total}`);
+        setPageInfo(`Página ${payload.page}/${payload.total}`);
       }
       return;
     }
@@ -120,7 +120,7 @@ export default function PdfViewerScreen() {
     if (payload.type === "loaded") {
       setLoading(false);
       setError(null);
-      setPageInfo(`Pagina ${payload.page}/${payload.total}`);
+      setPageInfo(`Página ${payload.page}/${payload.total}`);
       return;
     }
 
@@ -179,7 +179,7 @@ async function copyBundledAsset(moduleId: number, targetPath: string): Promise<v
   await asset.downloadAsync();
   const source = asset.localUri ?? asset.uri;
   if (!source) {
-    throw new Error("Asset PDF nao encontrado.");
+    throw new Error("Asset PDF não encontrado.");
   }
   await FileSystem.deleteAsync(targetPath, { idempotent: true });
   await FileSystem.copyAsync({ from: source, to: targetPath });

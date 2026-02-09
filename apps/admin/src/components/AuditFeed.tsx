@@ -43,7 +43,7 @@ export function AuditFeed() {
       const itemEntries: AuditEntry[] = items.map((item) => ({
         id: `i-${item.id}`,
         type: item.published ? "PUBLISH" : "UPDATE",
-        message: `Conteudo "${item.title}" ${item.published ? "publicado" : "atualizado"} (${item.type}).`,
+        message: `Conteúdo "${item.title}" ${item.published ? "publicado" : "atualizado"} (${item.type}).`,
         at: item.updated_at,
         source: "items",
       }));
@@ -51,7 +51,7 @@ export function AuditFeed() {
       const suggestionEntries: AuditEntry[] = suggestionsResult.items.map((suggestion) => ({
         id: `s-${suggestion.id}`,
         type: "CREATE",
-        message: `Nova sugestao recebida${suggestion.category ? ` (${suggestion.category})` : ""}.`,
+        message: `Nova sugestão recebida${suggestion.category ? ` (${suggestion.category})` : ""}.`,
         at: suggestion.created_at,
         source: "suggestions",
       }));
@@ -59,7 +59,7 @@ export function AuditFeed() {
       const authEntry: AuditEntry = {
         id: "auth-current-session",
         type: "LOGIN",
-        message: "Sessao autenticada no painel administrativo.",
+        message: "Sessão autenticada no painel administrativo.",
         at: new Date().toISOString(),
         source: "auth",
       };
@@ -91,7 +91,7 @@ export function AuditFeed() {
         <div>
           <h1>Auditoria</h1>
           <p className="text-muted">
-            Historico consolidado de publicacoes, atualizacoes e sugestoes recentes.
+            Histórico consolidado de publicações, atualizações e sugestões recentes.
           </p>
         </div>
         <Button variant="outline" onClick={() => void load()} disabled={loading} startIcon={<ShieldCheck size={15} />}>

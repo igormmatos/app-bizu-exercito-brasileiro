@@ -23,9 +23,9 @@ type AdminShellProps = {
 
 const MENU_ITEMS: Array<{ id: AdminView; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "items", label: "Gerenciar Conteudo", icon: FileText },
+  { id: "items", label: "Gerenciar Conteúdo", icon: FileText },
   { id: "categories", label: "Categorias", icon: FolderTree },
-  { id: "suggestions", label: "Sugestoes", icon: MessageSquareMore },
+  { id: "suggestions", label: "Sugestões", icon: MessageSquareMore },
   { id: "audit", label: "Auditoria", icon: ShieldCheck },
 ];
 
@@ -39,12 +39,12 @@ export function AdminShell({ user, activeView, onChangeView, onSignOut, children
           </div>
           <div>
             <p className="sidebar-brand__title">BIZUS ADMIN</p>
-            <p className="sidebar-brand__subtitle">Painel de Operacoes</p>
+            <p className="sidebar-brand__subtitle">Painel de Operações</p>
           </div>
         </div>
 
         <div className="sidebar-user">
-          <p className="sidebar-user__label">Usuario Logado</p>
+          <p className="sidebar-user__label">Usuário Logado</p>
           <p className="sidebar-user__name">{resolveUserName(user)}</p>
           <p className="sidebar-user__email">{user.email ?? user.id}</p>
         </div>
@@ -68,7 +68,7 @@ export function AdminShell({ user, activeView, onChangeView, onSignOut, children
         <div className="sidebar-footer">
           <button className="sidebar-link" onClick={() => onChangeView("dashboard")}>
             <Home size={16} />
-            <span>Voltar ao Inicio</span>
+            <span>Voltar ao Início</span>
           </button>
           <button className="sidebar-link sidebar-link--danger" onClick={() => void onSignOut()}>
             <LogOut size={16} />

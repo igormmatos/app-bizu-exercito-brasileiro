@@ -58,8 +58,8 @@ export default function AdminDiagnosticScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Admin/Diagnostico</Text>
-      <Text style={styles.line}>Rota tecnica (fora da barra de abas).</Text>
+      <Text style={styles.title}>Admin/Diagnóstico</Text>
+      <Text style={styles.line}>Rota técnica (fora da barra de abas).</Text>
 
       {loadingCache ? <Text style={styles.line}>Carregando cache local...</Text> : null}
       {loadingDownloads ? <Text style={styles.line}>Carregando status de downloads...</Text> : null}
@@ -69,7 +69,7 @@ export default function AdminDiagnosticScreen() {
         <Text style={styles.kv}>Itens em cache: {items.length}</Text>
         <Text style={styles.kv}>Itens baixados: {downloadedCount}</Text>
         <Text style={styles.kv}>Bizu do Dia: {bizuOfTheDay?.title ?? "nenhum"}</Text>
-        <Text style={styles.kv}>Ultimo sync: {lastSyncAt ?? "nunca"}</Text>
+        <Text style={styles.kv}>Último sync: {lastSyncAt ?? "nunca"}</Text>
       </View>
 
       <View style={styles.actions}>

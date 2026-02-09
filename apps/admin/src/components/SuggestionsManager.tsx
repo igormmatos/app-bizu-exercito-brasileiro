@@ -10,7 +10,7 @@ import {
 import { Badge, Button, Card, Input, Modal } from "./ui";
 
 const PAGE_SIZE = 50;
-const BASE_CATEGORY_OPTIONS = ["Conteudo", "Bug", "UX", "Outro"];
+const BASE_CATEGORY_OPTIONS = ["Conteúdo", "Bug", "UX", "Outro"];
 
 export function SuggestionsManager() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -153,7 +153,7 @@ export function SuggestionsManager() {
     <section className="section">
       <header className="page-header">
         <div>
-          <h1>Sugestoes</h1>
+          <h1>Sugestões</h1>
           <p className="text-muted">{suggestions.length} registros na listagem atual</p>
         </div>
         <Button variant="outline" onClick={() => void refreshFirstPage()} disabled={loading}>
@@ -193,7 +193,7 @@ export function SuggestionsManager() {
             label="Busca (mensagem)"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Ex: login, conteudo, erro..."
+            placeholder="Ex: login, conteúdo, erro..."
           />
 
           <div className="filters-actions">
@@ -203,11 +203,11 @@ export function SuggestionsManager() {
       </Card>
 
       {error ? <div className="error-box">{error}</div> : null}
-      {loading ? <p className="text-muted">Carregando sugestoes...</p> : null}
+      {loading ? <p className="text-muted">Carregando sugestões...</p> : null}
 
       {!loading && suggestions.length === 0 ? (
         <Card>
-          <p className="text-muted">Nenhuma sugestao encontrada.</p>
+          <p className="text-muted">Nenhuma sugestão encontrada.</p>
         </Card>
       ) : null}
 
@@ -221,7 +221,7 @@ export function SuggestionsManager() {
                 <th>Categoria</th>
                 <th>Contato</th>
                 <th>Mensagem</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -256,7 +256,7 @@ export function SuggestionsManager() {
 
       <Modal
         open={Boolean(selected)}
-        title="Detalhe da sugestao"
+        title="Detalhe da sugestão"
         onClose={closeDetails}
         footer={
           <>
@@ -288,10 +288,10 @@ export function SuggestionsManager() {
                 <strong>Contato:</strong> {selected.contact ?? "-"}
               </div>
               <div>
-                <strong>App version:</strong> {selected.app_version ?? "-"}
+                <strong>Versão do app:</strong> {selected.app_version ?? "-"}
               </div>
               <div>
-                <strong>Device:</strong> {selected.device ?? "-"}
+                <strong>Dispositivo:</strong> {selected.device ?? "-"}
               </div>
             </div>
 
@@ -315,7 +315,7 @@ export function SuggestionsManager() {
             </label>
 
             {statusReadOnly ? (
-              <div className="readonly-note">Sem permissao para alterar status; somente leitura.</div>
+              <div className="readonly-note">Sem permissão para alterar status; somente leitura.</div>
             ) : null}
             {modalNotice ? <div className="error-box">{modalNotice}</div> : null}
           </div>

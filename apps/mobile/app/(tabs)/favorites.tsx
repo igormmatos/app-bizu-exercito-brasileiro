@@ -35,7 +35,7 @@ export default function FavoritesScreen() {
         {!loadingCache && !loadingFavorites && favoriteItems.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Nenhum favorito ainda</Text>
-            <Text style={styles.emptyText}>Voce ainda nao favoritou nenhum item.</Text>
+            <Text style={styles.emptyText}>Você ainda não favoritou nenhum item.</Text>
           </Card>
         ) : null}
 

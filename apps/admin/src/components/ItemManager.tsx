@@ -216,7 +216,7 @@ export function ItemManager() {
     <section className="section">
       <header className="page-header">
         <div>
-          <h1>Gerenciar Conteudo</h1>
+          <h1>Gerenciar Conteúdo</h1>
           <p className="text-muted">{sortedItems.length} itens listados</p>
         </div>
         <Button startIcon={<Plus size={15} />} onClick={openNew}>
@@ -226,7 +226,7 @@ export function ItemManager() {
 
       <Card className="content-toolbar">
         <Input
-          placeholder="Buscar por titulo, descricao ou tags..."
+          placeholder="Buscar por título, descrição ou tags..."
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -244,7 +244,7 @@ export function ItemManager() {
         </label>
 
         <label className="ui-field">
-          <span className="ui-field__label">Publicacao</span>
+          <span className="ui-field__label">Publicação</span>
           <select
             value={filterPublished}
             onChange={(event) => setFilterPublished(event.target.value as ItemPublishedFilter)}
@@ -277,7 +277,7 @@ export function ItemManager() {
               Mostrando {paginatedItems.length} de {sortedItems.length} itens
             </div>
             <label className="datatable-page-size">
-              <span>Linhas por pagina</span>
+              <span>Linhas por página</span>
               <select
                 value={String(pageSize)}
                 onChange={(event) => setPageSize(Number(event.target.value))}
@@ -295,7 +295,7 @@ export function ItemManager() {
               <tr>
                 <th>
                   <button type="button" className="datatable-sort" onClick={() => handleSort("title")}>
-                    Titulo <ArrowUpDown size={13} />
+                    Título <ArrowUpDown size={13} />
                   </button>
                 </th>
                 <th>
@@ -308,7 +308,7 @@ export function ItemManager() {
                     Tipo <ArrowUpDown size={13} />
                   </button>
                 </th>
-                <th>Versao</th>
+                <th>Versão</th>
                 <th>
                   <button type="button" className="datatable-sort" onClick={() => handleSort("published")}>
                     Status <ArrowUpDown size={13} />
@@ -319,7 +319,7 @@ export function ItemManager() {
                     Atualizado <ArrowUpDown size={13} />
                   </button>
                 </th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -368,7 +368,7 @@ export function ItemManager() {
 
           <div className="datatable-footer">
             <span className="text-muted">
-              Pagina {currentPage} de {totalPages}
+              Página {currentPage} de {totalPages}
             </span>
             <div className="datatable-footer__actions">
               <Button
@@ -387,7 +387,7 @@ export function ItemManager() {
                 disabled={currentPage >= totalPages}
                 startIcon={<ChevronRight size={14} />}
               >
-                Proxima
+                Próxima
               </Button>
             </div>
           </div>
@@ -396,7 +396,7 @@ export function ItemManager() {
 
       <Modal
         open={modalOpen}
-        title={form.id ? "Editar Conteudo" : "Novo Conteudo"}
+        title={form.id ? "Editar Conteúdo" : "Novo Conteúdo"}
         onClose={() => {
           setModalOpen(false);
           setForm(EMPTY_FORM);
@@ -418,14 +418,14 @@ export function ItemManager() {
               Cancelar
             </Button>
             <Button type="submit" form="item-form" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar Conteudo"}
+              {saving ? "Salvando..." : "Salvar Conteúdo"}
             </Button>
           </>
         }
       >
         <form id="item-form" className="form-grid" onSubmit={handleSubmit}>
           <Input
-            label="Titulo"
+            label="Título"
             value={form.title}
             onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
             required
@@ -459,13 +459,13 @@ export function ItemManager() {
           </label>
 
           <Input
-            label="Tags (separadas por virgula)"
+            label="Tags (separadas por vírgula)"
             value={form.tagsInput}
             onChange={(event) => setForm((prev) => ({ ...prev, tagsInput: event.target.value }))}
           />
 
           <label className="ui-field span-2">
-            <span className="ui-field__label">Descricao</span>
+            <span className="ui-field__label">Descrição</span>
             <textarea
               rows={3}
               value={form.description}
@@ -476,7 +476,7 @@ export function ItemManager() {
 
           {form.type === "text" ? (
             <label className="ui-field span-2">
-              <span className="ui-field__label">Texto (obrigatorio para type=text)</span>
+              <span className="ui-field__label">Texto (obrigatório para type=text)</span>
               <textarea
                 rows={6}
                 value={form.textBody}

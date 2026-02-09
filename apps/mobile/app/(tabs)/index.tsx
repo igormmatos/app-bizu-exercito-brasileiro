@@ -64,7 +64,7 @@ export default function HomeScreen() {
           onChangeText={setSearchQuery}
           onSubmitEditing={openSearch}
           onFocus={openSearch}
-          placeholder="Buscar bizu, cancao..."
+          placeholder="Buscar bizu, canção..."
           returnKeyType="search"
         />
 
@@ -123,7 +123,7 @@ export default function HomeScreen() {
               {bizuOfTheDay.title}
             </Text>
             <Text style={styles.bizuMeta} numberOfLines={2}>
-              {bizuOfTheDay.description ?? "Bizu em destaque para consulta rapida."}
+              {bizuOfTheDay.description ?? "Bizu em destaque para consulta rápida."}
             </Text>
             <Pressable
               style={styles.bizuButton}
@@ -139,7 +139,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {!loadingCache && recentItems.length > 0 ? <Text style={styles.sectionTitle}>Acesso rapido</Text> : null}
+        {!loadingCache && recentItems.length > 0 ? <Text style={styles.sectionTitle}>Acesso rápido</Text> : null}
         {!loadingCache
           ? recentItems.map((item) => (
               <ContentListItem

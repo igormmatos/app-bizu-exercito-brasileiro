@@ -163,3 +163,37 @@
 - Timestamp do log em `TODO.md`: `YYYY-MM-DD HH:MM (local)`.
 - Sem correções de código nesta etapa, apenas documentação.
 - Decisões não fechadas ficam explicitamente em `Decisões Pendentes`.
+
+## 11. Execução A1 — Baseline técnico mobile/admin/shared (Fase A)
+
+Status geral da A1: concluída com ressalvas de ambiente (sem correção de código).
+
+| Comando | Status | Evidência resumida |
+|---|---|---|
+| `npm -w apps/mobile run start -- --web` | Falhou | Porta `8081` em uso + execução não interativa exigindo confirmação de porta alternativa (`Use port 8083 instead?`). |
+| `cd apps/mobile && npx tsc --noEmit` | Tentado (limitação de shell) | No ambiente automatizado, o encadeamento com `cd &&` não executou como esperado na mesma sessão. |
+| `npx tsc --noEmit` (executado em `apps/mobile`, equivalente operacional) | Passou | Typecheck do mobile finalizado com exit code `0`. |
+| `npm -w apps/admin run build` | Passou (com alerta) | Build concluído; alerta de chunk > 500 kB (`assets/index-*.js` ~824 kB). |
+| `npm -w packages/shared run typecheck` | Passou | `tsc --noEmit` concluído com exit code `0`. |
+
+Observações da A1:
+- Nenhuma correção foi aplicada, conforme escopo.
+- Falhas/limitações registradas apenas como evidência de baseline.
+- A tarefa A1 fica concluída porque todos os comandos foram executados ou tentados com documentação explícita dos resultados.
+
+Reexecução da A1 em `2026-02-09 18:27 (local)`:
+- `npm -w apps/mobile run start -- --web`: falhou novamente por porta ocupada e prompt interativo em ambiente non-interactive.
+- `cd apps/mobile && npx tsc --noEmit`: tentativa direta no runner retornou help do `tsc` (limitação do encadeamento no ambiente automatizado); validação equivalente realizada com `workdir=apps/mobile` e `npx tsc --noEmit` passou.
+- `npm -w apps/admin run build`: passou, mantendo alerta de chunk > 500 kB.
+- `npm -w packages/shared run typecheck`: passou.
+
+## 12. Execução A2 — Checklist Expo Go ponta a ponta (Fase A)
+
+Registro em `2026-02-09 18:36 (local)`:
+- Relatório manual de QA criado em `QA_EXPO_GO.md`.
+- O arquivo contém todos os itens da seção 3 deste plano com:
+  - passos
+  - status (`ok`/`erro`/`nao testado`)
+  - evidência
+  - notes
+- Esta execução não altera código e não executa A3+.

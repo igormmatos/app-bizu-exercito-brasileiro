@@ -40,9 +40,9 @@ export function Dashboard() {
 
       setMetrics([
         { id: "m1", label: "Categorias", value: String(categories.length), icon: FolderOpen },
-        { id: "m2", label: "Conteudos", value: String(items.length), icon: Boxes },
+        { id: "m2", label: "Conteúdos", value: String(items.length), icon: Boxes },
         { id: "m3", label: "Publicados", value: String(publishedItems), icon: CheckCircle2 },
-        { id: "m4", label: "Sugestoes (new)", value: String(newSuggestions.length), icon: MessageSquareText },
+        { id: "m4", label: "Sugestões (new)", value: String(newSuggestions.length), icon: MessageSquareText },
       ]);
 
       const data = buildChartData(categories, items);
@@ -62,7 +62,7 @@ export function Dashboard() {
       <header className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p className="text-muted">Visao geral do catalogo e status de publicacao.</p>
+          <p className="text-muted">Visão geral do catálogo e status de publicação.</p>
         </div>
         <Button variant="outline" onClick={() => void load()} disabled={loading}>
           Atualizar
@@ -71,7 +71,7 @@ export function Dashboard() {
 
       {error ? <div className="error-box">{error}</div> : null}
 
-      {loading ? <p className="text-muted">Carregando metricas...</p> : null}
+      {loading ? <p className="text-muted">Carregando métricas...</p> : null}
 
       {!loading ? (
         <>
@@ -93,12 +93,12 @@ export function Dashboard() {
           </div>
 
           <Card
-            title="Distribuicao de Conteudo por Categoria"
+            title="Distribuição de Conteúdo por Categoria"
             subtitle="Itens cadastrados por categoria (publicados + rascunhos)"
             className="chart-card"
           >
             {chartData.length === 0 ? (
-              <p className="text-muted">Sem dados para o grafico.</p>
+              <p className="text-muted">Sem dados para o gráfico.</p>
             ) : (
               <div className="chart-wrapper">
                 <ResponsiveContainer width="100%" height={320}>

@@ -37,7 +37,7 @@ export default function ItemDetailScreen() {
       return "";
     }
     const audioTextBody = (item as { text_body?: string | null }).text_body;
-    return audioTextBody?.trim() || item.description?.trim() || "Sem letra cadastrada para este audio.";
+    return audioTextBody?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
   }, [item]);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function ItemDetailScreen() {
     try {
       await downloadItemMedia(item.id, item.storage_path, item.type as DownloadableMediaType);
       await reloadDownloads();
-      setMessage("Download concluido.");
+      setMessage("Download concluído.");
     } catch (error) {
       setMessage(toMessage(error, "Falha ao baixar item."));
     } finally {
@@ -190,7 +190,7 @@ export default function ItemDetailScreen() {
 
       audioPlayer.play();
     } catch (error) {
-      setMessage(toMessage(error, "Falha ao reproduzir audio."));
+      setMessage(toMessage(error, "Falha ao reproduzir áudio."));
     } finally {
       setAudioBusy(false);
     }
@@ -212,7 +212,7 @@ export default function ItemDetailScreen() {
 
         {!loadingCache && !item ? (
           <Card>
-            <Text style={styles.metaText}>Item nao encontrado no cache.</Text>
+            <Text style={styles.metaText}>Item não encontrado no cache.</Text>
           </Card>
         ) : null}
 
@@ -233,7 +233,7 @@ export default function ItemDetailScreen() {
 
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.subtitle} numberOfLines={2}>
-              {item.description ?? "Sem descricao cadastrada."}
+              {item.description ?? "Sem descrição cadastrada."}
             </Text>
 
             {item.type === "pdf" ? (
@@ -277,7 +277,7 @@ export default function ItemDetailScreen() {
                 </View>
 
                 <View style={styles.lyricsBox}>
-                  <Text style={styles.lyricsLabel}>LETRA DA CANCAO</Text>
+                  <Text style={styles.lyricsLabel}>LETRA DA CANÇÃO</Text>
                   <ScrollView nestedScrollEnabled style={styles.lyricsScroll}>
                     <Text style={styles.lyricsText}>{lyricsText}</Text>
                   </ScrollView>
@@ -287,7 +287,7 @@ export default function ItemDetailScreen() {
 
             {item.type === "text" ? (
               <Card>
-                <Text style={styles.textBody}>{item.text_body ?? "Sem conteudo textual."}</Text>
+                <Text style={styles.textBody}>{item.text_body ?? "Sem conteúdo textual."}</Text>
               </Card>
             ) : null}
 

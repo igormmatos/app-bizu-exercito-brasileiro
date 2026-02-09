@@ -34,6 +34,8 @@
 - [x] `C25` Safe Area (iPhone notch) aplicado no mobile.
 - [x] Arquivo de descrição da loja criado (store/description.txt)
 - [x] Plano gerado (PLAN.md)
+- [x] `A1` Rodar baseline técnico mobile/admin/shared (Fase A — Stabilization/QA)
+- [x] `A2` Checklist Expo Go ponta a ponta estruturado em `QA_EXPO_GO.md` (preenchimento manual pendente)
 
 ## 🕒 Log de Execucoes do Codex
 - `2026-02-07 10:49 (local)` Atualizados `README.md` e `TODO.md` para refletir o estado atual do monorepo, arquitetura, fluxo de dados e plano de execucao. Tarefas impactadas: `C1`, `C2`, `C3`, `C4`, `C5`, `C6`, `C7`, `B1`, `B2`, `B3`, `B4`, `B5`.
@@ -57,3 +59,6 @@
 - `2026-02-07 20:52 (local)` Aplicado Safe Area no `apps/mobile`: `SafeAreaProvider` no root, novos componentes `Screen` e `SafeHeader` com `insets.top`, e padronizacao das telas principais (Home, Favoritos, Sugestao, Categoria, Detalhes e Busca) para evitar corte em notch/Dynamic Island sem alterar logica de negocio. Tarefas impactadas: `C25`, `B5`.
 - `2026-02-07 22:21 (local)` Criado `store/description.txt` com descricao em texto puro para App Store/Play Store, conforme conteudo definido, e atualizado `TODO.md` com item concluido. Tarefas impactadas: `E`, `F`.
 - `2026-02-07 22:30 (local)` Gerado `PLAN.md` com inventario tecnico, riscos, checklists Expo Go/Build, gaps de publicacao e plano incremental (Fases A/B/C); atualizado `TODO.md` com item concluido. Tarefas impactadas: `Planejamento de Release`.
+- `2026-02-07 22:37 (local)` Executada a tarefa `A1` (baseline tecnico mobile/admin/shared): `npm -w apps/mobile run start -- --web` falhou por porta ocupada + prompt non-interactive; typecheck mobile validado via `npx tsc --noEmit` em `apps/mobile`; `npm -w apps/admin run build` e `npm -w packages/shared run typecheck` passaram (com alerta de chunk grande no admin). Atualizados `PLAN.md` e `TODO.md` com os resultados. Tarefas impactadas: `A1`.
+- `2026-02-09 18:27 (local)` Reexecutada validacao da tarefa `A1` (baseline tecnico mobile/admin/shared): `npm -w apps/mobile run start -- --web` falhou por porta ocupada + prompt interativo em non-interactive; `cd apps/mobile && npx tsc --noEmit` nao foi confiavel no runner e foi validado por execucao equivalente com `workdir=apps/mobile` (passou); `npm -w apps/admin run build` passou com alerta de chunk grande; `npm -w packages/shared run typecheck` passou. Resultados documentados no `PLAN.md`. Tarefas impactadas: `A1`.
+- `2026-02-09 18:36 (local)` Executada a tarefa `A2` (checklist Expo Go ponta a ponta): criado `QA_EXPO_GO.md` na raiz com todos os itens da seção 3 do `PLAN.md` em formato preenchivel (passos, status, evidencia e notes), e registrado em `PLAN.md` o apontamento da execucao A2. Nenhuma alteracao de codigo. Tarefas impactadas: `A2`.

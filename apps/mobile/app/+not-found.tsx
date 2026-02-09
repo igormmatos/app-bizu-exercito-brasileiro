@@ -4,9 +4,9 @@ import { StyleSheet, Text, View } from "react-native";
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: "Nao encontrado" }} />
+      <Stack.Screen options={{ title: "Não encontrado" }} />
       <View style={styles.container}>
-        <Text style={styles.title}>Esta tela nao existe.</Text>
+        <Text style={styles.title}>Esta tela não existe.</Text>
 
         <Link href="/" style={styles.link}>
           <Text style={styles.linkText}>Voltar para Home</Text>

@@ -88,7 +88,7 @@ export async function updateSuggestionStatus(
 
   if (error) {
     if (isPermissionError(error.code, error.message)) {
-      throw new SuggestionsPermissionError("Sem permissao para alterar status; somente leitura.");
+      throw new SuggestionsPermissionError("Sem permissão para alterar status; somente leitura.");
     }
     throw new Error(`Failed to update suggestion status: ${error.message}`);
   }
