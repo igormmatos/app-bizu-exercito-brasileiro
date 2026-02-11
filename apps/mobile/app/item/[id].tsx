@@ -8,6 +8,7 @@ import { Screen } from "@/src/components/layout";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
 import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "@/src/lib/downloadManager";
+import { addRecentItem } from "@/src/lib/recentCache";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
 
@@ -67,6 +68,13 @@ export default function ItemDetailScreen() {
       active = false;
     };
   }, [downloadedEntry?.localUri]);
+
+  useEffect(() => {
+    if (!item?.id) {
+      return;
+    }
+    void addRecentItem(item.id);
+  }, [item?.id]);
 
   async function handleDownload() {
     if (!item || item.type === "text" || !item.storage_path) {

@@ -3,19 +3,25 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+import { Screen } from "@/src/components/layout";
 
 type ViewerMessage =
   | { type: "viewer-ready" }
   | { type: "loading"; page: number; total: number }
   | { type: "loaded"; page: number; total: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "zoom-state"; scale: number };
+
+type ViewerCommand = "ZOOM_IN" | "ZOOM_OUT" | "ZOOM_RESET";
 
 const PDFJS_DIR = `${FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? ""}pdfjs-viewer/`;
 
 export default function PdfViewerScreen() {
   const { uri: rawUri, title } = useLocalSearchParams<{ uri?: string; title?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
 
   const pdfUri = useMemo(() => (typeof rawUri === "string" ? rawUri : ""), [rawUri]);
@@ -27,6 +33,7 @@ export default function PdfViewerScreen() {
   const [viewerReady, setViewerReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pageInfo, setPageInfo] = useState<string | null>(null);
+  const [zoomInfo, setZoomInfo] = useState("120%");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +49,7 @@ export default function PdfViewerScreen() {
       setViewerReady(false);
       setLocalBase64(null);
       setPageInfo(null);
+      setZoomInfo("120%");
 
       await FileSystem.makeDirectoryAsync(PDFJS_DIR, { intermediates: true });
       await copyBundledAsset(require("../assets/pdfjs/viewer.html"), `${PDFJS_DIR}viewer.html`);
@@ -109,6 +117,13 @@ export default function PdfViewerScreen() {
       return;
     }
 
+    if (payload.type === "zoom-state") {
+      if (typeof payload.scale === "number" && Number.isFinite(payload.scale)) {
+        setZoomInfo(`${Math.round(payload.scale * 100)}%`);
+      }
+      return;
+    }
+
     if (payload.type === "loading") {
       setLoading(true);
       if (payload.total > 0) {
@@ -130,9 +145,25 @@ export default function PdfViewerScreen() {
     }
   }
 
+  function sendViewerCommand(command: ViewerCommand) {
+    if (!webViewRef.current || !viewerReady || !!error) {
+      return;
+    }
+    const payload = { type: command };
+    const serialized = JSON.stringify(payload);
+
+    // Primary channel (RN -> WebView message event).
+    webViewRef.current.postMessage(serialized);
+
+    // Fallback channel for platforms/webview versions where message delivery is flaky.
+    webViewRef.current.injectJavaScript(
+      `window.__BIZU_HANDLE_NATIVE_MESSAGE && window.__BIZU_HANDLE_NATIVE_MESSAGE(${serialized}); true;`,
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <Screen edges={["left", "right"]} backgroundColor="#fff" style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Voltar</Text>
         </Pressable>
@@ -140,37 +171,62 @@ export default function PdfViewerScreen() {
           <Text style={styles.title} numberOfLines={1}>
             {pdfTitle}
           </Text>
-          {pageInfo ? <Text style={styles.meta}>{pageInfo}</Text> : null}
+          {pageInfo ? <Text style={styles.meta}>{`${pageInfo} | Zoom ${zoomInfo}`}</Text> : null}
+        </View>
+        <View style={styles.zoomActions}>
+          <Pressable
+            style={styles.zoomButton}
+            onPress={() => sendViewerCommand("ZOOM_OUT")}
+            disabled={!viewerReady || !!error}
+          >
+            <Text style={styles.zoomButtonText}>-</Text>
+          </Pressable>
+          <Pressable
+            style={styles.zoomResetButton}
+            onPress={() => sendViewerCommand("ZOOM_RESET")}
+            disabled={!viewerReady || !!error}
+          >
+            <Text style={styles.zoomButtonText}>{zoomInfo}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.zoomButton}
+            onPress={() => sendViewerCommand("ZOOM_IN")}
+            disabled={!viewerReady || !!error}
+          >
+            <Text style={styles.zoomButtonText}>+</Text>
+          </Pressable>
         </View>
       </View>
 
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
+      <View style={styles.viewerContainer}>
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
-      {viewerUri ? (
-        <WebView
-          ref={webViewRef}
-          source={{ uri: viewerUri }}
-          originWhitelist={["*"]}
-          onMessage={handleWebViewMessage}
-          allowFileAccess
-          allowingReadAccessToURL={PDFJS_DIR}
-          allowFileAccessFromFileURLs
-          allowUniversalAccessFromFileURLs
-          style={styles.webView}
-        />
-      ) : null}
+        {viewerUri ? (
+          <WebView
+            ref={webViewRef}
+            source={{ uri: viewerUri }}
+            originWhitelist={["*"]}
+            onMessage={handleWebViewMessage}
+            allowFileAccess
+            allowingReadAccessToURL={PDFJS_DIR}
+            allowFileAccessFromFileURLs
+            allowUniversalAccessFromFileURLs
+            style={styles.webView}
+          />
+        ) : null}
 
-      {loading ? (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="small" color="#1f6feb" />
-          <Text style={styles.loadingText}>Carregando PDF...</Text>
-        </View>
-      ) : null}
-    </View>
+        {loading ? (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="small" color="#1f6feb" />
+            <Text style={styles.loadingText}>Carregando PDF...</Text>
+          </View>
+        ) : null}
+      </View>
+    </Screen>
   );
 }
 
@@ -202,10 +258,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#d8dde3",
     backgroundColor: "#fff",
+  },
+  viewerContainer: {
+    flex: 1,
   },
   backButton: {
     borderWidth: 1,
@@ -221,6 +280,38 @@ const styles = StyleSheet.create({
   headerInfo: {
     flex: 1,
     gap: 2,
+  },
+  zoomActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  zoomButton: {
+    minWidth: 30,
+    borderWidth: 1,
+    borderColor: "#1f6feb",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  zoomResetButton: {
+    minWidth: 52,
+    borderWidth: 1,
+    borderColor: "#1f6feb",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  zoomButtonText: {
+    color: "#1f6feb",
+    fontSize: 12,
+    fontWeight: "700",
   },
   title: {
     fontSize: 16,
@@ -245,7 +336,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     position: "absolute",
-    top: 56,
+    top: 0,
     left: 0,
     right: 0,
     alignItems: "center",

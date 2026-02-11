@@ -36,6 +36,11 @@
 - [x] Plano gerado (PLAN.md)
 - [x] `A1` Rodar baseline técnico mobile/admin/shared (Fase A — Stabilization/QA)
 - [x] `A2` Checklist Expo Go ponta a ponta estruturado em `QA_EXPO_GO.md` (preenchimento manual pendente)
+- [x] Fix loop back na Busca (P0)
+- [x] Safe Area PDF (P1)
+- [x] Fix zoom PDF (P1)
+- [x] Removida duplicidade de comandos no topo do PDF (P1)
+- [x] Recentes (Acesso rápido) (P2)
 
 ## 🕒 Log de Execucoes do Codex
 - `2026-02-07 10:49 (local)` Atualizados `README.md` e `TODO.md` para refletir o estado atual do monorepo, arquitetura, fluxo de dados e plano de execucao. Tarefas impactadas: `C1`, `C2`, `C3`, `C4`, `C5`, `C6`, `C7`, `B1`, `B2`, `B3`, `B4`, `B5`.
@@ -62,3 +67,8 @@
 - `2026-02-07 22:37 (local)` Executada a tarefa `A1` (baseline tecnico mobile/admin/shared): `npm -w apps/mobile run start -- --web` falhou por porta ocupada + prompt non-interactive; typecheck mobile validado via `npx tsc --noEmit` em `apps/mobile`; `npm -w apps/admin run build` e `npm -w packages/shared run typecheck` passaram (com alerta de chunk grande no admin). Atualizados `PLAN.md` e `TODO.md` com os resultados. Tarefas impactadas: `A1`.
 - `2026-02-09 18:27 (local)` Reexecutada validacao da tarefa `A1` (baseline tecnico mobile/admin/shared): `npm -w apps/mobile run start -- --web` falhou por porta ocupada + prompt interativo em non-interactive; `cd apps/mobile && npx tsc --noEmit` nao foi confiavel no runner e foi validado por execucao equivalente com `workdir=apps/mobile` (passou); `npm -w apps/admin run build` passou com alerta de chunk grande; `npm -w packages/shared run typecheck` passou. Resultados documentados no `PLAN.md`. Tarefas impactadas: `A1`.
 - `2026-02-09 18:36 (local)` Executada a tarefa `A2` (checklist Expo Go ponta a ponta): criado `QA_EXPO_GO.md` na raiz com todos os itens da seção 3 do `PLAN.md` em formato preenchivel (passos, status, evidencia e notes), e registrado em `PLAN.md` o apontamento da execucao A2. Nenhuma alteracao de codigo. Tarefas impactadas: `A2`.
+- `2026-02-09 19:06 (local)` Aplicado fix de navegacao da busca (P0) em `apps/mobile`: removido gatilho `onFocus` que disparava navegação automática para `/search` na Home, mantendo abertura da busca apenas por submit (`onSubmitEditing`). Objetivo: evitar loop ao voltar de `/search` e garantir retorno para a tela anterior. Tarefas impactadas: `P0 Busca`.
+- `2026-02-09 19:10 (local)` Aplicado ajuste de Safe Area no viewer PDF (`apps/mobile/app/pdf.tsx`): tela passou a usar `Screen` com header custom respeitando `insets.top`, mantendo WebView abaixo do header e removendo risco de corte no notch sem alterar lógica do pdf.js/renderização. Tarefas impactadas: `P1 PDF`.
+- `2026-02-09 19:14 (local)` Aplicado fix dos controles de zoom do PDF (`apps/mobile/app/pdf.tsx` + `apps/mobile/assets/pdfjs/viewer.txt`): padronizado protocolo de comandos (`ZOOM_IN`, `ZOOM_OUT`, `ZOOM_RESET`) no canal RN <-> WebView, criado handler único no viewer para aplicar escala com limites (0.5 a 3.0), e conectado controles de zoom na UI do app sem regressão de abertura local/remota. Tarefas impactadas: `P1 PDF Zoom`.
+- `2026-02-09 19:20 (local)` Ajustado viewer PDF para remover duplicidade visual de comandos no topo (`apps/mobile/assets/pdfjs/viewer.html`) e reforçado canal de comando RN -> WebView com fallback via `injectJavaScript` para os controles de zoom (`apps/mobile/app/pdf.tsx`, `apps/mobile/assets/pdfjs/viewer.txt`), mantendo abertura local/remota intacta. Tarefas impactadas: `P1 PDF Zoom`.
+- `2026-02-09 19:43 (local)` Implementado "Recentes" offline-first no mobile (`apps/mobile`): criado `src/lib/recentCache.ts` com chave `recent.itemIds` (dedupe + ordem por recência + limite 10), registro automático ao abrir `item/[id]`, e Home atualizada para renderizar seção "Acesso rápido" a partir dos itens recentes persistidos com filtro de ids órfãos. Sem backend/Supabase. Tarefas impactadas: `P2 Recentes`.

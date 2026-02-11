@@ -32,7 +32,8 @@
 2 o layout do leitor de pdf deve ser ajustado. Alguns comandos como o de zoom não estão sendo aplicados.
 2.1 acesso rápido, deve ser mais dinâmico. Ele deve exibir os ultimos arquivos abertos.
 3. ao abrir a busca, e tentar voltar, ele fica em loop voltando para a tela de busca e não volta para a tela inicial nunca. 
-3.1 talvez só exibir a pagina de busca depois de digitar e apertar o enter, ou deixar de forma mais fluida a transição  
+3.1 talvez só exibir a pagina de busca depois de digitar e apertar o enter, ou deixar de forma mais fluida a transição.
+  
 
 ### 2) Sync inicial e re-sync
 

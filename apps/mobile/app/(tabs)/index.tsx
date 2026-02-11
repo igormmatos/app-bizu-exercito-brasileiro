@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/src/components/layout";
 import { ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
+import { loadRecentItemIds } from "@/src/lib/recentCache";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors, type ContentType } from "@/src/theme/tokens";
 
@@ -12,6 +14,7 @@ export default function HomeScreen() {
   const { categories, items, loadingCache, loadingBizu, bizuOfTheDay, downloadedMap, isFavorite, toggleFavorite } =
     useCatalog();
   const [searchQuery, setSearchQuery] = useState("");
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
   const categoryStats = useMemo(() => {
     const stats = new Map<string, { total: number; offline: number }>();
@@ -31,14 +34,39 @@ export default function HomeScreen() {
     return stats;
   }, [categories, downloadedMap, items]);
 
-  const recentItems = useMemo(
-    () =>
-      items
-        .slice()
-        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-        .slice(0, 6),
-    [items],
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function loadRecent() {
+        try {
+          const ids = await loadRecentItemIds();
+          if (!active) return;
+          setRecentIds(ids);
+        } catch {
+          if (!active) return;
+          setRecentIds([]);
+        }
+      }
+
+      void loadRecent();
+      return () => {
+        active = false;
+      };
+    }, []),
   );
+
+  const recentItems = useMemo(() => {
+    if (!recentIds.length) {
+      return [];
+    }
+
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return recentIds
+      .map((id) => byId.get(id))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .slice(0, 10);
+  }, [items, recentIds]);
 
   function openSearch() {
     const q = searchQuery.trim();
@@ -63,7 +91,6 @@ export default function HomeScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={openSearch}
-          onFocus={openSearch}
           placeholder="Buscar bizu, canção..."
           returnKeyType="search"
         />
