@@ -29,6 +29,7 @@ type ItemFormState = {
   categoryId: string;
   tagsInput: string;
   published: boolean;
+  link: string;
   textBody: string;
   existingStoragePath: string | null;
 };
@@ -41,6 +42,7 @@ const EMPTY_FORM: ItemFormState = {
   categoryId: "",
   tagsInput: "",
   published: false,
+  link: "",
   textBody: "",
   existingStoragePath: null,
 };
@@ -147,6 +149,7 @@ export function ItemManager() {
       categoryId: item.category_id,
       tagsInput: item.tags?.join(", ") ?? "",
       published: item.published,
+      link: item.link ?? "",
       textBody: item.text_body ?? "",
       existingStoragePath: item.storage_path ?? null,
     });
@@ -182,7 +185,25 @@ export function ItemManager() {
       return;
     }
 
-    if (form.type !== "text" && !selectedFile && !form.existingStoragePath) {
+    const normalizedLink = form.link.trim();
+    if (form.type === "video") {
+      if (selectedFile) {
+        setError("Itens de vídeo não aceitam upload de arquivo. Informe apenas o link do YouTube.");
+        return;
+      }
+
+      if (!normalizedLink) {
+        setError("Link do YouTube é obrigatório para itens de vídeo.");
+        return;
+      }
+
+      if (!isYoutubeUrl(normalizedLink)) {
+        setError("Informe um link válido do YouTube (youtube.com ou youtu.be).");
+        return;
+      }
+    }
+
+    if (form.type !== "text" && form.type !== "video" && !selectedFile && !form.existingStoragePath) {
       setError("File upload is required for pdf, audio or image items.");
       return;
     }
@@ -219,6 +240,7 @@ export function ItemManager() {
           categoryId: form.categoryId,
           tagsInput: form.tagsInput,
           published: form.published,
+          link: normalizedLink,
           textBody: form.textBody,
           existingStoragePath: form.existingStoragePath,
           file: selectedFile,
@@ -307,7 +329,8 @@ export function ItemManager() {
     setForm((prev) => ({
       ...prev,
       type: nextType,
-      textBody: nextType === "text" || nextType === "image" ? prev.textBody : "",
+      link: nextType === "video" ? prev.link : "",
+      textBody: nextType === "text" || nextType === "image" || nextType === "audio" || nextType === "video" ? prev.textBody : "",
       existingStoragePath: isStoragePathCompatibleWithType(prev.existingStoragePath, nextType)
         ? prev.existingStoragePath
         : null,
@@ -647,6 +670,7 @@ export function ItemManager() {
               <option value="audio">audio</option>
               <option value="image">image</option>
               <option value="text">text</option>
+              <option value="video">video</option>
             </select>
           </label>
 
@@ -712,69 +736,98 @@ export function ItemManager() {
             </div>
           ) : null}
 
-          <div className="ui-field span-2">
-            <span className="ui-field__label">Upload ({uploadLabelByType(form.type)})</span>
-            <label className="upload-dropzone">
-              <UploadCloud size={18} />
-              <p>{uploadHintByType(form.type)}</p>
+          {form.type === "video" ? (
+            <label className="ui-field span-2">
+              <span className="ui-field__label">Link (YouTube)</span>
               <input
-                type="file"
-                accept={getAcceptForType(form.type)}
-                onChange={(event) => {
-                  setSelectedFile(event.target.files?.[0] ?? null);
-                  setUploadStatus("idle");
-                  setUploadProgress(null);
-                }}
-                required={form.type !== "text" && !form.id && !form.existingStoragePath}
-                disabled={saving}
+                type="url"
+                value={form.link}
+                onChange={(event) => setForm((prev) => ({ ...prev, link: event.target.value }))}
+                className="ui-input"
+                placeholder="https://www.youtube.com/watch?v=..."
+                required
               />
-              {form.existingStoragePath ? (
-                <small>
-                  Arquivo atual: <code>{form.existingStoragePath}</code>
-                </small>
-              ) : null}
             </label>
+          ) : null}
 
-            {form.existingStoragePath ? (
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setForm((prev) => ({ ...prev, existingStoragePath: null }));
-                }}
-              >
-                Remover arquivo atual
-              </Button>
-            ) : null}
+          {form.type === "audio" || form.type === "video" ? (
+            <label className="ui-field span-2">
+              <span className="ui-field__label">Letra (opcional)</span>
+              <textarea
+                rows={6}
+                value={form.textBody}
+                onChange={(event) => setForm((prev) => ({ ...prev, textBody: event.target.value }))}
+                className="ui-textarea"
+                placeholder="Digite a letra da canção (opcional)"
+              />
+            </label>
+          ) : null}
 
-            {uploadProgress ? (
-              <div className="upload-progress-panel" role="status" aria-live="polite">
-                <div className="upload-progress-track">
-                  <div className="upload-progress-fill" style={{ width: `${uploadProgress.percent}%` }} />
+          {form.type !== "video" ? (
+            <div className="ui-field span-2">
+              <span className="ui-field__label">Upload ({uploadLabelByType(form.type)})</span>
+              <label className="upload-dropzone">
+                <UploadCloud size={18} />
+                <p>{uploadHintByType(form.type)}</p>
+                <input
+                  type="file"
+                  accept={getAcceptForType(form.type)}
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null);
+                    setUploadStatus("idle");
+                    setUploadProgress(null);
+                  }}
+                  required={form.type !== "text" && !form.id && !form.existingStoragePath}
+                  disabled={saving}
+                />
+                {form.existingStoragePath ? (
+                  <small>
+                    Arquivo atual: <code>{form.existingStoragePath}</code>
+                  </small>
+                ) : null}
+              </label>
+
+              {form.existingStoragePath ? (
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setForm((prev) => ({ ...prev, existingStoragePath: null }));
+                  }}
+                >
+                  Remover arquivo atual
+                </Button>
+              ) : null}
+
+              {uploadProgress ? (
+                <div className="upload-progress-panel" role="status" aria-live="polite">
+                  <div className="upload-progress-track">
+                    <div className="upload-progress-fill" style={{ width: `${uploadProgress.percent}%` }} />
+                  </div>
+                  <p className="upload-progress-label">
+                    {uploadProgress.percent}% • faltam {formatMegabytes(uploadProgress.remainingBytes)} de{" "}
+                    {formatMegabytes(uploadProgress.totalBytes)}
+                  </p>
+                  {uploadStatus === "finalizing" ? (
+                    <p className="upload-progress-note">Finalizando cadastro...</p>
+                  ) : null}
+                  {uploadStatus === "cancelled" ? (
+                    <p className="upload-progress-note upload-progress-note--warning">Upload cancelado.</p>
+                  ) : null}
+                  {uploadStatus === "error" ? (
+                    <p className="upload-progress-note upload-progress-note--error">Falha no upload.</p>
+                  ) : null}
                 </div>
-                <p className="upload-progress-label">
-                  {uploadProgress.percent}% • faltam {formatMegabytes(uploadProgress.remainingBytes)} de{" "}
-                  {formatMegabytes(uploadProgress.totalBytes)}
-                </p>
-                {uploadStatus === "finalizing" ? (
-                  <p className="upload-progress-note">Finalizando cadastro...</p>
-                ) : null}
-                {uploadStatus === "cancelled" ? (
-                  <p className="upload-progress-note upload-progress-note--warning">Upload cancelado.</p>
-                ) : null}
-                {uploadStatus === "error" ? (
-                  <p className="upload-progress-note upload-progress-note--error">Falha no upload.</p>
-                ) : null}
-              </div>
-            ) : null}
+              ) : null}
 
-            {saving && uploadStatus === "uploading" && uploadAbortController ? (
-              <Button variant="outline" type="button" onClick={handleCancelUpload}>
-                Cancelar upload
-              </Button>
-            ) : null}
-          </div>
+              {saving && uploadStatus === "uploading" && uploadAbortController ? (
+                <Button variant="outline" type="button" onClick={handleCancelUpload}>
+                  Cancelar upload
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="checkbox-row span-2">
             <input
@@ -801,18 +854,21 @@ function getAcceptForType(type: ItemType): string {
   if (type === "pdf") return ".pdf,application/pdf";
   if (type === "audio") return "audio/*";
   if (type === "image") return "image/*";
+  if (type === "video") return "";
   return "image/*";
 }
 
 function uploadLabelByType(type: ItemType): string {
   if (type === "text") return "imagem opcional";
   if (type === "image") return "imagem obrigatória";
+  if (type === "video") return "não aplicável";
   return type;
 }
 
 function uploadHintByType(type: ItemType): string {
   if (type === "text") return "Selecione uma imagem para complementar o texto (opcional)";
   if (type === "image") return "Selecione uma imagem para upload";
+  if (type === "video") return "Upload não disponível para vídeo";
   return "Selecione um arquivo para upload";
 }
 
@@ -824,7 +880,29 @@ function isStoragePathCompatibleWithType(storagePath: string | null, type: ItemT
   if (type === "pdf") {
     return storagePath.startsWith("pdf/");
   }
+  if (type === "video") {
+    return false;
+  }
   return storagePath.startsWith("audio/");
+}
+
+function isYoutubeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      hostname === "youtube.com" ||
+      hostname.endsWith(".youtube.com") ||
+      hostname === "youtu.be" ||
+      hostname.endsWith(".youtu.be")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function renderHtmlBlocks(blocks: HtmlBlockNode[]): JSX.Element {

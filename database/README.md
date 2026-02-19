@@ -15,6 +15,7 @@ Esta pasta versiona os scripts SQL para executar manualmente no Supabase SQL Edi
 10. `database/010_items_text_image_hybrid.sql`
 11. `database/011_migrate_items_markdown_to_html.sql`
 12. `database/012_video_type.sql`
+13. `database/013_items_audio_video_separate_constraints.sql`
 
 ## O que cada script faz
 - `001_tables.sql`: cria `public.categories` e `public.items`, checks de consistencia, funcao/trigger de `updated_at`.
@@ -29,6 +30,7 @@ Esta pasta versiona os scripts SQL para executar manualmente no Supabase SQL Edi
 - `010_items_text_image_hybrid.sql`: permite combinacao de texto+imagem em `items` para tipos `text` e `image`, com validacao de prefixo de `storage_path`.
 - `011_migrate_items_markdown_to_html.sql`: migra `text_body` legado (markdown/texto puro) para HTML simples seguro para renderizacao no app e no admin.
 - `012_video_type.sql`: adiciona suporte a `type='video'` em `items`, cria coluna `link` (se ausente), exige link YouTube valido para video e obriga `storage_path` nulo para esse tipo.
+- `013_items_audio_video_separate_constraints.sql`: separa validacoes de `audio` e `video` em constraints dedicadas, permitindo letra opcional em `audio`/`video` e mantendo `video` com link YouTube e `storage_path` nulo.
 
 ## Permissoes e storage
 - Os scripts assumem execucao no SQL Editor com permissao administrativa.

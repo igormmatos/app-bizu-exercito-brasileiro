@@ -19,6 +19,7 @@ export type ItemInput = {
   categoryId: string;
   tagsInput?: string;
   published: boolean;
+  link?: string;
   textBody?: string;
   existingStoragePath?: string | null;
   file?: File | null;
@@ -123,6 +124,7 @@ export async function saveItem(input: ItemInput, options?: SaveItemOptions): Pro
   const tags = normalizeTags(input.tagsInput);
   const now = new Date().toISOString();
 
+  const normalizedLink = normalizeOptionalText(input.link);
   const normalizedText = normalizeOptionalText(input.textBody);
   let storagePath = normalizeStoragePath(input.existingStoragePath);
   let textBody: string | null = null;
@@ -163,17 +165,46 @@ export async function saveItem(input: ItemInput, options?: SaveItemOptions): Pro
     }
 
     textBody = normalizedText;
-  } else {
+  } else if (input.type === "video") {
     if (input.file) {
-      storagePath = await uploadItemFile(itemId, input.type, input.file, storagePath, options);
+      throw new Error("Video items do not accept file upload. Use a YouTube link.");
+    }
+
+    if (!normalizedLink) {
+      throw new Error("YouTube link is required for video items.");
+    }
+
+    if (!isYoutubeUrl(normalizedLink)) {
+      throw new Error("Invalid YouTube link. Use a valid youtube.com or youtu.be URL.");
+    }
+
+    storagePath = null;
+    textBody = normalizedText;
+  } else if (input.type === "audio") {
+    if (input.file) {
+      storagePath = await uploadItemFile(itemId, "audio", input.file, storagePath, options);
     }
 
     if (!storagePath) {
-      throw new Error("File upload is required for pdf or audio items.");
+      throw new Error("File upload is required for audio items.");
     }
 
-    if (!storagePath.startsWith(`${input.type}/`)) {
-      throw new Error(`Invalid storage path for ${input.type} item.`);
+    if (!storagePath.startsWith("audio/")) {
+      throw new Error("Invalid storage path for audio item.");
+    }
+
+    textBody = normalizedText;
+  } else {
+    if (input.file) {
+      storagePath = await uploadItemFile(itemId, "pdf", input.file, storagePath, options);
+    }
+
+    if (!storagePath) {
+      throw new Error("File upload is required for pdf items.");
+    }
+
+    if (!storagePath.startsWith("pdf/")) {
+      throw new Error("Invalid storage path for pdf item.");
     }
 
     textBody = null;
@@ -187,6 +218,7 @@ export async function saveItem(input: ItemInput, options?: SaveItemOptions): Pro
     category_id: categoryId,
     tags,
     published: input.published,
+    link: input.type === "video" ? normalizedLink : null,
     storage_path: storagePath,
     text_body: textBody,
     updated_at: now,
@@ -435,4 +467,23 @@ function createAbortError(): Error {
   const error = new Error("Upload aborted by user.");
   error.name = "AbortError";
   return error;
+}
+
+function isYoutubeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      hostname === "youtube.com" ||
+      hostname.endsWith(".youtube.com") ||
+      hostname === "youtu.be" ||
+      hostname.endsWith(".youtu.be")
+    );
+  } catch {
+    return false;
+  }
 }
