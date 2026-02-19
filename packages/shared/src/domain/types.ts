@@ -1,4 +1,4 @@
-export type ItemType = "pdf" | "audio" | "image" | "text";
+export type ItemType = "pdf" | "audio" | "image" | "text" | "video";
 
 export type Category = {
   id: string;
@@ -15,6 +15,7 @@ type CatalogItemBase = {
   category_id: string;
   tags?: string[] | null;
   published: boolean;
+  link?: string | null;
   updated_at: string;
 };
 
@@ -33,7 +34,7 @@ type CatalogItemPdf = CatalogItemBase & {
 type CatalogItemAudio = CatalogItemBase & {
   type: "audio";
   storage_path: string;
-  text_body?: null;
+  text_body?: string | null;
 };
 
 type CatalogItemImage = CatalogItemBase & {
@@ -42,6 +43,13 @@ type CatalogItemImage = CatalogItemBase & {
   text_body?: string | null;
 };
 
+type CatalogItemVideo = CatalogItemBase & {
+  type: "video";
+  link: string;
+  storage_path?: null;
+  text_body?: string | null;
+};
+
 export type CatalogItemBinary = CatalogItemPdf | CatalogItemAudio | CatalogItemImage;
 
-export type CatalogItem = CatalogItemText | CatalogItemBinary;
+export type CatalogItem = CatalogItemText | CatalogItemBinary | CatalogItemVideo;
