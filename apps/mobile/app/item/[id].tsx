@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import { Alert, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, Image } from "react-native";
-import { WebView } from "react-native-webview";
+import YoutubePlayer from "react-native-youtube-iframe";
 import { Screen } from "@/src/components/layout";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
@@ -39,7 +39,7 @@ export default function ItemDetailScreen() {
   const isMediaItem = Boolean(mediaType && item?.storage_path);
   const remoteUrl = item?.storage_path ? getPublicContentUrl(item.storage_path) : null;
   const videoLink = item?.type === "video" ? (item.link?.trim() ?? "") : "";
-  const youtubeEmbedUrl = useMemo(() => getYouTubeEmbedUrl(videoLink), [videoLink]);
+  const youtubeVideoId = useMemo(() => getYouTubeId(videoLink), [videoLink]);
   const canRenderEmbeddedVideo = Platform.OS !== "web";
   const imageSourceUri = mediaType === "image" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
   const audioSource = mediaType === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
@@ -312,12 +312,12 @@ export default function ItemDetailScreen() {
     if (!lyricsNoticeShown) {
       if (Platform.OS === "web") {
         setLyricsNoticeShown(true);
-        setMessage("Aviso: a letra pode conter conteúdo sensível.");
+        setMessage(LYRICS_NOTICE_MESSAGE);
         setLyricsExpanded(true);
         return;
       }
 
-      Alert.alert("Aviso", "A letra pode conter conteúdo sensível.", [
+      Alert.alert("Aviso", LYRICS_NOTICE_MESSAGE, [
         {
           text: "Cancelar",
           style: "cancel",
@@ -467,16 +467,21 @@ export default function ItemDetailScreen() {
 
             {item.type === "video" ? (
               <Card style={styles.videoCard}>
-                {youtubeEmbedUrl && !videoEmbedFailed && canRenderEmbeddedVideo ? (
+                {youtubeVideoId && !videoEmbedFailed && canRenderEmbeddedVideo ? (
                   <View style={styles.videoEmbedFrame}>
-                    <WebView
-                      source={{ uri: youtubeEmbedUrl }}
-                      style={styles.videoEmbed}
-                      allowsFullscreenVideo
-                      javaScriptEnabled
-                      domStorageEnabled
+                    <YoutubePlayer
+                      height={220}
+                      play={false}
+                      videoId={youtubeVideoId}
+                      webViewStyle={styles.videoEmbed}
+                      webViewProps={{
+                        allowsInlineMediaPlayback: true,
+                      }}
+                      initialPlayerParams={{
+                        rel: false,
+                        controls: true,
+                      }}
                       onError={() => setVideoEmbedFailed(true)}
-                      onHttpError={() => setVideoEmbedFailed(true)}
                     />
                   </View>
                 ) : (
@@ -646,11 +651,13 @@ export default function ItemDetailScreen() {
 
             {item.type === "text" && mediaType === "image" ? (
               <Card style={styles.inlineImageCard}>
-                {imageSourceUri ? (
-                  <Image source={{ uri: imageSourceUri }} style={styles.inlineImage} resizeMode="cover" />
-                ) : (
-                  <Text style={styles.metaText}>Imagem indisponível.</Text>
-                )}
+                <View style={styles.inlineImageFrame}>
+                  {imageSourceUri ? (
+                    <Image source={{ uri: imageSourceUri }} style={styles.inlineImage} resizeMode="contain" />
+                  ) : (
+                    <Text style={styles.metaText}>Imagem indisponível.</Text>
+                  )}
+                </View>
               </Card>
             ) : null}
 
@@ -879,7 +886,7 @@ const styles = StyleSheet.create({
   },
   lyricsText: {
     color: colors.gray700,
-    textAlign: "left",
+    textAlign: "center",
     fontStyle: "italic",
     fontFamily: "serif",
     fontSize: 16,
@@ -903,6 +910,7 @@ const styles = StyleSheet.create({
     color: colors.gray700,
     fontSize: 15,
     lineHeight: 24,
+    textAlign: "justify",
   },
   markdownRoot: {
     gap: 8,
@@ -911,6 +919,7 @@ const styles = StyleSheet.create({
     color: colors.gray700,
     fontSize: 15,
     lineHeight: 24,
+    textAlign: "justify",
   },
   markdownList: {
     gap: 6,
@@ -930,6 +939,7 @@ const styles = StyleSheet.create({
     color: colors.gray700,
     fontSize: 15,
     lineHeight: 24,
+    textAlign: "justify",
   },
   markdownBold: {
     fontWeight: "700",
@@ -945,9 +955,16 @@ const styles = StyleSheet.create({
     padding: 0,
     overflow: "hidden",
   },
+  inlineImageFrame: {
+    width: "100%",
+    aspectRatio: 1,
+    backgroundColor: colors.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   inlineImage: {
     width: "100%",
-    height: 230,
+    height: "100%",
   },
   offlineHeader: {
     flexDirection: "row",
@@ -981,6 +998,8 @@ function formatSeconds(value: number): string {
 
 const LYRICS_COLLAPSED_LINES = 10;
 const LYRICS_TOGGLE_CHAR_THRESHOLD = 600;
+const LYRICS_NOTICE_MESSAGE =
+  'Esta letra é exibida com finalidade informativa e educativa.\nCaso haja qualquer questão relacionada a direitos autorais, utilize a opção "Reportar conteúdo".';
 
 function toMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
@@ -1043,15 +1062,6 @@ function getYouTubeId(link: string): string | null {
   }
 
   return null;
-}
-
-function getYouTubeEmbedUrl(link: string): string | null {
-  const videoId = getYouTubeId(link);
-  if (!videoId) {
-    return null;
-  }
-
-  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
 }
 
 function renderHtmlBlocks(blocks: ReturnType<typeof parseSafeHtml>) {
