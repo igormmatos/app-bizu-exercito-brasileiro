@@ -11,7 +11,7 @@ import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "
 import { addRecentItem } from "@/src/lib/recentCache";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
-import { parseSimpleMarkdown, type MarkdownInlineNode } from "@bizu/shared";
+import { parseSafeHtml, type HtmlInlineNode } from "@bizu/shared";
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,7 +42,7 @@ export default function ItemDetailScreen() {
   const displayedAudioTime = isScrubbing && scrubTime !== null ? scrubTime : audioCurrentTime;
   const audioProgress = audioDuration > 0 ? Math.max(0, Math.min(1, displayedAudioTime / audioDuration)) : 0;
   const textContent = item?.text_body?.trim() ?? "";
-  const textBlocks = useMemo(() => parseSimpleMarkdown(textContent), [textContent]);
+  const textBlocks = useMemo(() => parseSafeHtml(textContent), [textContent]);
   const lyricsText = useMemo(() => {
     if (!item || mediaType !== "audio") {
       return "";
@@ -487,22 +487,22 @@ export default function ItemDetailScreen() {
               </Card>
             ) : null}
 
-            {(item.type === "text" || (item.type === "image" && textBlocks.length > 0)) ? (
-              <Card>
-                {textBlocks.length > 0 ? (
-                  <View style={styles.markdownRoot}>{renderMarkdownBlocks(textBlocks)}</View>
-                ) : (
-                  <Text style={styles.textBody}>Sem conteúdo textual.</Text>
-                )}
-              </Card>
-            ) : null}
-
             {item.type === "text" && mediaType === "image" ? (
               <Card style={styles.inlineImageCard}>
                 {imageSourceUri ? (
                   <Image source={{ uri: imageSourceUri }} style={styles.inlineImage} resizeMode="cover" />
                 ) : (
                   <Text style={styles.metaText}>Imagem indisponível.</Text>
+                )}
+              </Card>
+            ) : null}
+
+            {(item.type === "text" || (item.type === "image" && textBlocks.length > 0)) ? (
+              <Card>
+                {textBlocks.length > 0 ? (
+                  <View style={styles.markdownRoot}>{renderHtmlBlocks(textBlocks)}</View>
+                ) : (
+                  <Text style={styles.textBody}>Sem conteúdo textual.</Text>
                 )}
               </Card>
             ) : null}
@@ -816,12 +816,12 @@ function resolveMediaType(
   return null;
 }
 
-function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
+function renderHtmlBlocks(blocks: ReturnType<typeof parseSafeHtml>) {
   return blocks.map((block, blockIndex) => {
     if (block.type === "paragraph") {
       return (
         <Text key={`paragraph-${blockIndex}`} style={styles.markdownParagraph}>
-          {renderMarkdownInline(block.inlines)}
+          {renderHtmlInline(block.inlines)}
         </Text>
       );
     }
@@ -830,8 +830,8 @@ function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
       <View key={`list-${blockIndex}`} style={styles.markdownList}>
         {block.items.map((item, itemIndex) => (
           <View key={`list-item-${blockIndex}-${itemIndex}`} style={styles.markdownListItem}>
-            <Text style={styles.markdownBullet}>•</Text>
-            <Text style={styles.markdownListText}>{renderMarkdownInline(item)}</Text>
+            <Text style={styles.markdownBullet}>{block.ordered ? `${itemIndex + 1}.` : "•"}</Text>
+            <Text style={styles.markdownListText}>{renderHtmlInline(item)}</Text>
           </View>
         ))}
       </View>
@@ -839,31 +839,27 @@ function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
   });
 }
 
-function renderMarkdownInline(nodes: MarkdownInlineNode[]) {
+function renderHtmlInline(nodes: HtmlInlineNode[]) {
   return nodes.map((node, index) => {
-    if (node.type === "bold") {
-      return (
-        <Text key={`bold-${index}`} style={styles.markdownBold}>
-          {node.text}
-        </Text>
-      );
+    if (node.type === "br") {
+      return <Text key={`br-${index}`}>{"\n"}</Text>;
     }
 
-    if (node.type === "italic") {
-      return (
-        <Text key={`italic-${index}`} style={styles.markdownItalic}>
-          {node.text}
-        </Text>
-      );
-    }
+    const style = [
+      node.bold ? styles.markdownBold : null,
+      node.italic ? styles.markdownItalic : null,
+      node.href ? styles.markdownLink : null,
+    ];
 
-    if (node.type === "link") {
+    if (node.href) {
       return (
         <Text
           key={`link-${index}`}
-          style={styles.markdownLink}
+          style={style}
           onPress={() => {
-            void Linking.openURL(node.href);
+            if (node.href) {
+              void Linking.openURL(node.href);
+            }
           }}
         >
           {node.text}
@@ -871,6 +867,10 @@ function renderMarkdownInline(nodes: MarkdownInlineNode[]) {
       );
     }
 
-    return <Text key={`text-${index}`}>{node.text}</Text>;
+    return (
+      <Text key={`text-${index}`} style={style}>
+        {node.text}
+      </Text>
+    );
   });
 }

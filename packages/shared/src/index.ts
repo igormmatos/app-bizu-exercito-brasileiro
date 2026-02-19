@@ -1,13 +1,13 @@
 import { z, ZodError } from "zod";
 import { CatalogItemSchema, CategorySchema } from "./domain/schema";
 import type { CatalogItem, Category } from "./domain/types";
-import type { MarkdownBlockNode, MarkdownInlineNode } from "./markdown/simpleMarkdown";
-import { parseSimpleMarkdown } from "./markdown/simpleMarkdown";
+import type { HtmlBlockNode, HtmlInlineNode } from "./html/safeHtml";
+import { parseSafeHtml } from "./html/safeHtml";
 
 export type { CatalogItem, Category, ItemType } from "./domain/types";
 export { CatalogItemSchema, CategorySchema } from "./domain/schema";
-export type { MarkdownBlockNode, MarkdownInlineNode };
-export { parseSimpleMarkdown };
+export type { HtmlBlockNode, HtmlInlineNode };
+export { parseSafeHtml };
 
 function formatZodError(prefix: string, error: ZodError): Error {
   const details = error.issues

@@ -1,12 +1,12 @@
 import { ArrowUpDown, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  parseSimpleMarkdown,
+  parseSafeHtml,
   type CatalogItem,
   type Category,
+  type HtmlBlockNode,
+  type HtmlInlineNode,
   type ItemType,
-  type MarkdownBlockNode,
-  type MarkdownInlineNode,
 } from "@bizu/shared";
 import {
   deleteItem,
@@ -92,7 +92,7 @@ export function ItemManager() {
     const start = (currentPage - 1) * pageSize;
     return sortedItems.slice(start, start + pageSize);
   }, [sortedItems, currentPage, pageSize]);
-  const markdownPreviewBlocks = useMemo(() => parseSimpleMarkdown(form.textBody), [form.textBody]);
+  const htmlPreviewBlocks = useMemo(() => parseSafeHtml(form.textBody), [form.textBody]);
 
   useEffect(() => {
     void loadCategories();
@@ -327,11 +327,11 @@ export function ItemManager() {
   }
 
   function handleInsertBold() {
-    insertMarkdownToken("**", "**", "texto");
+    insertHtmlWrapperTag("strong", "texto em destaque");
   }
 
   function handleInsertItalic() {
-    insertMarkdownToken("*", "*", "texto");
+    insertHtmlWrapperTag("em", "texto em ênfase");
   }
 
   function handleInsertList() {
@@ -339,11 +339,14 @@ export function ItemManager() {
     const value = form.textBody;
     const selectionStart = textarea?.selectionStart ?? value.length;
     const selectionEnd = textarea?.selectionEnd ?? value.length;
-    const selected = value.slice(selectionStart, selectionEnd) || "Item";
-    const normalized = selected
-      .split("\n")
-      .map((line) => (line.trim() ? `- ${line.trim()}` : "- "))
+    const selected = value.slice(selectionStart, selectionEnd).trim() || "Item";
+    const items = selected
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => `  <li>${line}</li>`)
       .join("\n");
+    const normalized = `<ul>\n${items || "  <li>Item</li>"}\n</ul>`;
     const nextValue = `${value.slice(0, selectionStart)}${normalized}${value.slice(selectionEnd)}`;
 
     setForm((prev) => ({ ...prev, textBody: nextValue }));
@@ -360,9 +363,9 @@ export function ItemManager() {
     const selectionStart = textarea?.selectionStart ?? value.length;
     const selectionEnd = textarea?.selectionEnd ?? value.length;
     const selected = value.slice(selectionStart, selectionEnd).trim() || "texto";
-    const template = `[${selected}](https://)`;
+    const template = `<a href="https://">${selected}</a>`;
     const nextValue = `${value.slice(0, selectionStart)}${template}${value.slice(selectionEnd)}`;
-    const urlStart = selectionStart + selected.length + 3;
+    const urlStart = selectionStart + "<a href=\"".length;
     const urlEnd = urlStart + "https://".length;
 
     setForm((prev) => ({ ...prev, textBody: nextValue }));
@@ -373,15 +376,15 @@ export function ItemManager() {
     });
   }
 
-  function insertMarkdownToken(before: string, after: string, placeholder: string) {
+  function insertHtmlWrapperTag(tagName: "strong" | "em", placeholder: string) {
     const textarea = textBodyRef.current;
     const value = form.textBody;
     const selectionStart = textarea?.selectionStart ?? value.length;
     const selectionEnd = textarea?.selectionEnd ?? value.length;
     const selected = value.slice(selectionStart, selectionEnd) || placeholder;
-    const insertion = `${before}${selected}${after}`;
+    const insertion = `<${tagName}>${selected}</${tagName}>`;
     const nextValue = `${value.slice(0, selectionStart)}${insertion}${value.slice(selectionEnd)}`;
-    const nextStart = selectionStart + before.length;
+    const nextStart = selectionStart + tagName.length + 2;
     const nextEnd = nextStart + selected.length;
 
     setForm((prev) => ({ ...prev, textBody: nextValue }));
@@ -667,8 +670,8 @@ export function ItemManager() {
             <div className="ui-field span-2">
               <span className="ui-field__label">
                 {form.type === "text"
-                  ? "Texto (Markdown simples, obrigatório)"
-                  : "Texto complementar (Markdown simples, opcional)"}
+                  ? "Texto (HTML simples, obrigatório)"
+                  : "Texto complementar (HTML simples, opcional)"}
               </span>
 
               <div className="markdown-toolbar" role="toolbar" aria-label="Formatação de texto">
@@ -693,14 +696,14 @@ export function ItemManager() {
                 onChange={(event) => setForm((prev) => ({ ...prev, textBody: event.target.value }))}
                 className="ui-textarea markdown-editor"
                 required={form.type === "text"}
-                placeholder="Ex.: **Título**, *ênfase*, - item e [link](https://...)"
+                placeholder='Ex.: <p><strong>Título</strong> com <em>ênfase</em> e <a href="https://...">link</a></p>'
               />
 
               <div className="markdown-preview">
                 <span className="ui-field__label">Pré-visualização</span>
                 <div className="markdown-preview__body">
-                  {markdownPreviewBlocks.length > 0 ? (
-                    renderMarkdownBlocks(markdownPreviewBlocks)
+                  {htmlPreviewBlocks.length > 0 ? (
+                    renderHtmlBlocks(htmlPreviewBlocks)
                   ) : (
                     <p className="markdown-preview__empty">Nada para pré-visualizar.</p>
                   )}
@@ -824,46 +827,52 @@ function isStoragePathCompatibleWithType(storagePath: string | null, type: ItemT
   return storagePath.startsWith("audio/");
 }
 
-function renderMarkdownBlocks(blocks: MarkdownBlockNode[]): JSX.Element {
+function renderHtmlBlocks(blocks: HtmlBlockNode[]): JSX.Element {
   return (
     <div className="markdown-render">
       {blocks.map((block, index) => {
         if (block.type === "paragraph") {
           return (
             <p key={`paragraph-${index}`} className="markdown-render__paragraph">
-              {renderMarkdownInlineNodes(block.inlines)}
+              {renderHtmlInlineNodes(block.inlines)}
             </p>
           );
         }
 
+        const ListTag = block.ordered ? "ol" : "ul";
         return (
-          <ul key={`list-${index}`} className="markdown-render__list">
+          <ListTag key={`list-${index}`} className="markdown-render__list">
             {block.items.map((item, itemIndex) => (
-              <li key={`list-item-${index}-${itemIndex}`}>{renderMarkdownInlineNodes(item)}</li>
+              <li key={`list-item-${index}-${itemIndex}`}>{renderHtmlInlineNodes(item)}</li>
             ))}
-          </ul>
+          </ListTag>
         );
       })}
     </div>
   );
 }
 
-function renderMarkdownInlineNodes(nodes: MarkdownInlineNode[]): JSX.Element[] {
+function renderHtmlInlineNodes(nodes: HtmlInlineNode[]): JSX.Element[] {
   return nodes.map((node, index) => {
-    if (node.type === "bold") {
-      return <strong key={`bold-${index}`}>{node.text}</strong>;
+    if (node.type === "br") {
+      return <br key={`br-${index}`} />;
     }
-    if (node.type === "italic") {
-      return <em key={`italic-${index}`}>{node.text}</em>;
+
+    let content: JSX.Element = <span>{node.text}</span>;
+    if (node.bold) {
+      content = <strong>{content}</strong>;
     }
-    if (node.type === "link") {
-      return (
-        <a key={`link-${index}`} href={node.href} target="_blank" rel="noreferrer">
-          {node.text}
+    if (node.italic) {
+      content = <em>{content}</em>;
+    }
+    if (node.href) {
+      content = (
+        <a href={node.href} target="_blank" rel="noreferrer">
+          {content}
         </a>
       );
     }
-    return <span key={`text-${index}`}>{node.text}</span>;
+    return <span key={`text-${index}`}>{content}</span>;
   });
 }
 

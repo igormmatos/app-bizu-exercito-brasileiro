@@ -1,6 +1,6 @@
 import { FileText, Image as ImageIcon, Pause, Play, PlayIcon, Repeat, RotateCcw, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import { parseSimpleMarkdown, type CatalogItem, type MarkdownInlineNode } from "@bizu/shared";
+import { parseSafeHtml, type CatalogItem, type HtmlInlineNode } from "@bizu/shared";
 import { getPublicFileUrl } from "../lib/catalogApi";
 import { Modal } from "./ui";
 
@@ -16,7 +16,7 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
   const mediaUrl = mediaType && item.storage_path ? getPublicFileUrl(item.storage_path) : null;
   const audioLyrics = resolveAudioLyrics(item);
   const textBody = item.text_body?.trim() ?? "";
-  const markdownBlocks = parseSimpleMarkdown(textBody);
+  const htmlBlocks = parseSafeHtml(textBody);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [repeatEnabled, setRepeatEnabled] = useState(false);
@@ -126,12 +126,6 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
             </div>
           ) : null}
 
-          {(item.type === "text" || (item.type === "image" && textBody)) ? (
-            <div className="mobile-preview-card">
-              {markdownBlocks.length > 0 ? renderMarkdownBlocks(markdownBlocks) : <p className="mobile-preview-text-body">Sem conteúdo textual.</p>}
-            </div>
-          ) : null}
-
           {item.type === "text" && mediaType === "image" ? (
             <div className="mobile-preview-card mobile-preview-inline-image-card">
               {mediaUrl ? (
@@ -139,6 +133,12 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
               ) : (
                 <p className="mobile-preview-message">Imagem indisponível para pré-visualização.</p>
               )}
+            </div>
+          ) : null}
+
+          {(item.type === "text" || (item.type === "image" && textBody)) ? (
+            <div className="mobile-preview-card">
+              {htmlBlocks.length > 0 ? renderHtmlBlocks(htmlBlocks) : <p className="mobile-preview-text-body">Sem conteúdo textual.</p>}
             </div>
           ) : null}
 
@@ -217,45 +217,51 @@ function resolveMediaType(item: CatalogItem): "pdf" | "audio" | "image" | null {
   return null;
 }
 
-function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
+function renderHtmlBlocks(blocks: ReturnType<typeof parseSafeHtml>) {
   return (
     <div className="mobile-preview-markdown">
       {blocks.map((block, index) => {
         if (block.type === "paragraph") {
           return (
             <p key={`paragraph-${index}`} className="mobile-preview-markdown__paragraph">
-              {renderMarkdownInline(block.inlines)}
+              {renderHtmlInline(block.inlines)}
             </p>
           );
         }
 
+        const ListTag = block.ordered ? "ol" : "ul";
         return (
-          <ul key={`list-${index}`} className="mobile-preview-markdown__list">
+          <ListTag key={`list-${index}`} className="mobile-preview-markdown__list">
             {block.items.map((item, itemIndex) => (
-              <li key={`list-item-${index}-${itemIndex}`}>{renderMarkdownInline(item)}</li>
+              <li key={`list-item-${index}-${itemIndex}`}>{renderHtmlInline(item)}</li>
             ))}
-          </ul>
+          </ListTag>
         );
       })}
     </div>
   );
 }
 
-function renderMarkdownInline(nodes: MarkdownInlineNode[]) {
+function renderHtmlInline(nodes: HtmlInlineNode[]) {
   return nodes.map((node, index) => {
-    if (node.type === "bold") {
-      return <strong key={`bold-${index}`}>{node.text}</strong>;
+    if (node.type === "br") {
+      return <br key={`br-${index}`} />;
     }
-    if (node.type === "italic") {
-      return <em key={`italic-${index}`}>{node.text}</em>;
+
+    let content: JSX.Element = <span>{node.text}</span>;
+    if (node.bold) {
+      content = <strong>{content}</strong>;
     }
-    if (node.type === "link") {
-      return (
-        <a key={`link-${index}`} href={node.href} target="_blank" rel="noreferrer">
-          {node.text}
+    if (node.italic) {
+      content = <em>{content}</em>;
+    }
+    if (node.href) {
+      content = (
+        <a href={node.href} target="_blank" rel="noreferrer">
+          {content}
         </a>
       );
     }
-    return <span key={`text-${index}`}>{node.text}</span>;
+    return <span key={`text-${index}`}>{content}</span>;
   });
 }
