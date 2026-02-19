@@ -27,7 +27,7 @@ export function buildSearchIndex(items: CatalogItem[]): IndexedCatalogItem[] {
     const titleNormalized = normalize(item.title);
     const tagsNormalized = (item.tags ?? []).map((tag) => normalize(tag));
     const descriptionNormalized = normalize(item.description ?? "");
-    const textBodyNormalized = item.type === "text" ? normalize(item.text_body ?? "") : "";
+    const textBodyNormalized = normalize(item.text_body ?? "");
     const searchBlob = [titleNormalized, tagsNormalized.join(" "), descriptionNormalized, textBodyNormalized]
       .filter(Boolean)
       .join(" ");

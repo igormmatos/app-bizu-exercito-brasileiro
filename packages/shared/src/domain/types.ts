@@ -20,16 +20,28 @@ type CatalogItemBase = {
 
 export type CatalogItemText = CatalogItemBase & {
   type: "text";
-  storage_path?: null;
+  storage_path?: string | null;
   text_body: string;
 };
 
-type CatalogItemBinaryType = Exclude<ItemType, "text">;
-
-export type CatalogItemBinary = CatalogItemBase & {
-  type: CatalogItemBinaryType;
+type CatalogItemPdf = CatalogItemBase & {
+  type: "pdf";
   storage_path: string;
   text_body?: null;
 };
+
+type CatalogItemAudio = CatalogItemBase & {
+  type: "audio";
+  storage_path: string;
+  text_body?: null;
+};
+
+type CatalogItemImage = CatalogItemBase & {
+  type: "image";
+  storage_path: string;
+  text_body?: string | null;
+};
+
+export type CatalogItemBinary = CatalogItemPdf | CatalogItemAudio | CatalogItemImage;
 
 export type CatalogItem = CatalogItemText | CatalogItemBinary;

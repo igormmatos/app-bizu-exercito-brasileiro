@@ -1,6 +1,13 @@
 import { ArrowUpDown, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { CatalogItem, Category, ItemType } from "@bizu/shared";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  parseSimpleMarkdown,
+  type CatalogItem,
+  type Category,
+  type ItemType,
+  type MarkdownBlockNode,
+  type MarkdownInlineNode,
+} from "@bizu/shared";
 import {
   deleteItem,
   fetchCategories,
@@ -63,6 +70,7 @@ export function ItemManager() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
   const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
   const [updatingPublishedIds, setUpdatingPublishedIds] = useState<Set<string>>(new Set());
+  const textBodyRef = useRef<HTMLTextAreaElement | null>(null);
 
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category.name])), [categories]);
   const visibleItems = useMemo(() => {
@@ -84,6 +92,7 @@ export function ItemManager() {
     const start = (currentPage - 1) * pageSize;
     return sortedItems.slice(start, start + pageSize);
   }, [sortedItems, currentPage, pageSize]);
+  const markdownPreviewBlocks = useMemo(() => parseSimpleMarkdown(form.textBody), [form.textBody]);
 
   useEffect(() => {
     void loadCategories();
@@ -138,7 +147,7 @@ export function ItemManager() {
       categoryId: item.category_id,
       tagsInput: item.tags?.join(", ") ?? "",
       published: item.published,
-      textBody: item.type === "text" ? item.text_body : "",
+      textBody: item.text_body ?? "",
       existingStoragePath: item.storage_path ?? null,
     });
     setSelectedFile(null);
@@ -178,7 +187,12 @@ export function ItemManager() {
       return;
     }
 
-    const uploadingNewFile = form.type !== "text" && Boolean(selectedFile);
+    if ((form.type === "text" || form.type === "image") && selectedFile && !selectedFile.type.startsWith("image/")) {
+      setError("Para conteúdos de texto/imagem, selecione um arquivo de imagem válido.");
+      return;
+    }
+
+    const uploadingNewFile = Boolean(selectedFile);
     const uploadController = uploadingNewFile ? new AbortController() : null;
 
     if (uploadingNewFile && selectedFile) {
@@ -293,8 +307,10 @@ export function ItemManager() {
     setForm((prev) => ({
       ...prev,
       type: nextType,
-      textBody: nextType === "text" ? prev.textBody : "",
-      existingStoragePath: nextType === "text" ? null : prev.existingStoragePath,
+      textBody: nextType === "text" || nextType === "image" ? prev.textBody : "",
+      existingStoragePath: isStoragePathCompatibleWithType(prev.existingStoragePath, nextType)
+        ? prev.existingStoragePath
+        : null,
     }));
     setSelectedFile(null);
     resetUploadState();
@@ -308,6 +324,72 @@ export function ItemManager() {
 
     setSortKey(nextKey);
     setSortDirection(nextKey === "updated_at" ? "desc" : "asc");
+  }
+
+  function handleInsertBold() {
+    insertMarkdownToken("**", "**", "texto");
+  }
+
+  function handleInsertItalic() {
+    insertMarkdownToken("*", "*", "texto");
+  }
+
+  function handleInsertList() {
+    const textarea = textBodyRef.current;
+    const value = form.textBody;
+    const selectionStart = textarea?.selectionStart ?? value.length;
+    const selectionEnd = textarea?.selectionEnd ?? value.length;
+    const selected = value.slice(selectionStart, selectionEnd) || "Item";
+    const normalized = selected
+      .split("\n")
+      .map((line) => (line.trim() ? `- ${line.trim()}` : "- "))
+      .join("\n");
+    const nextValue = `${value.slice(0, selectionStart)}${normalized}${value.slice(selectionEnd)}`;
+
+    setForm((prev) => ({ ...prev, textBody: nextValue }));
+    window.requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionStart + normalized.length);
+    });
+  }
+
+  function handleInsertLink() {
+    const textarea = textBodyRef.current;
+    const value = form.textBody;
+    const selectionStart = textarea?.selectionStart ?? value.length;
+    const selectionEnd = textarea?.selectionEnd ?? value.length;
+    const selected = value.slice(selectionStart, selectionEnd).trim() || "texto";
+    const template = `[${selected}](https://)`;
+    const nextValue = `${value.slice(0, selectionStart)}${template}${value.slice(selectionEnd)}`;
+    const urlStart = selectionStart + selected.length + 3;
+    const urlEnd = urlStart + "https://".length;
+
+    setForm((prev) => ({ ...prev, textBody: nextValue }));
+    window.requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(urlStart, urlEnd);
+    });
+  }
+
+  function insertMarkdownToken(before: string, after: string, placeholder: string) {
+    const textarea = textBodyRef.current;
+    const value = form.textBody;
+    const selectionStart = textarea?.selectionStart ?? value.length;
+    const selectionEnd = textarea?.selectionEnd ?? value.length;
+    const selected = value.slice(selectionStart, selectionEnd) || placeholder;
+    const insertion = `${before}${selected}${after}`;
+    const nextValue = `${value.slice(0, selectionStart)}${insertion}${value.slice(selectionEnd)}`;
+    const nextStart = selectionStart + before.length;
+    const nextEnd = nextStart + selected.length;
+
+    setForm((prev) => ({ ...prev, textBody: nextValue }));
+    window.requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(nextStart, nextEnd);
+    });
   }
 
   return (
@@ -581,69 +663,115 @@ export function ItemManager() {
             />
           </label>
 
-          {form.type === "text" ? (
-            <label className="ui-field span-2">
-              <span className="ui-field__label">Texto (obrigatório para type=text)</span>
+          {form.type === "text" || form.type === "image" ? (
+            <div className="ui-field span-2">
+              <span className="ui-field__label">
+                {form.type === "text"
+                  ? "Texto (Markdown simples, obrigatório)"
+                  : "Texto complementar (Markdown simples, opcional)"}
+              </span>
+
+              <div className="markdown-toolbar" role="toolbar" aria-label="Formatação de texto">
+                <button type="button" className="markdown-toolbar__btn" onClick={handleInsertBold}>
+                  Negrito
+                </button>
+                <button type="button" className="markdown-toolbar__btn" onClick={handleInsertItalic}>
+                  Itálico
+                </button>
+                <button type="button" className="markdown-toolbar__btn" onClick={handleInsertList}>
+                  Lista
+                </button>
+                <button type="button" className="markdown-toolbar__btn" onClick={handleInsertLink}>
+                  Link
+                </button>
+              </div>
+
               <textarea
-                rows={6}
+                ref={textBodyRef}
+                rows={8}
                 value={form.textBody}
                 onChange={(event) => setForm((prev) => ({ ...prev, textBody: event.target.value }))}
-                className="ui-textarea"
-                required
+                className="ui-textarea markdown-editor"
+                required={form.type === "text"}
+                placeholder="Ex.: **Título**, *ênfase*, - item e [link](https://...)"
               />
-            </label>
-          ) : (
-            <div className="ui-field span-2">
-              <span className="ui-field__label">Upload ({form.type})</span>
-              <label className="upload-dropzone">
-                <UploadCloud size={18} />
-                <p>Selecione um arquivo para upload</p>
-                <input
-                  type="file"
-                  accept={getAcceptForType(form.type)}
-                  onChange={(event) => {
-                    setSelectedFile(event.target.files?.[0] ?? null);
-                    setUploadStatus("idle");
-                    setUploadProgress(null);
-                  }}
-                  required={!form.id && !form.existingStoragePath}
-                  disabled={saving}
-                />
-                {form.existingStoragePath ? (
-                  <small>
-                    Arquivo atual: <code>{form.existingStoragePath}</code>
-                  </small>
-                ) : null}
-              </label>
 
-              {uploadProgress ? (
-                <div className="upload-progress-panel" role="status" aria-live="polite">
-                  <div className="upload-progress-track">
-                    <div className="upload-progress-fill" style={{ width: `${uploadProgress.percent}%` }} />
-                  </div>
-                  <p className="upload-progress-label">
-                    {uploadProgress.percent}% • faltam {formatMegabytes(uploadProgress.remainingBytes)} de{" "}
-                    {formatMegabytes(uploadProgress.totalBytes)}
-                  </p>
-                  {uploadStatus === "finalizing" ? (
-                    <p className="upload-progress-note">Finalizando cadastro...</p>
-                  ) : null}
-                  {uploadStatus === "cancelled" ? (
-                    <p className="upload-progress-note upload-progress-note--warning">Upload cancelado.</p>
-                  ) : null}
-                  {uploadStatus === "error" ? (
-                    <p className="upload-progress-note upload-progress-note--error">Falha no upload.</p>
-                  ) : null}
+              <div className="markdown-preview">
+                <span className="ui-field__label">Pré-visualização</span>
+                <div className="markdown-preview__body">
+                  {markdownPreviewBlocks.length > 0 ? (
+                    renderMarkdownBlocks(markdownPreviewBlocks)
+                  ) : (
+                    <p className="markdown-preview__empty">Nada para pré-visualizar.</p>
+                  )}
                 </div>
-              ) : null}
-
-              {saving && uploadStatus === "uploading" && uploadAbortController ? (
-                <Button variant="outline" type="button" onClick={handleCancelUpload}>
-                  Cancelar upload
-                </Button>
-              ) : null}
+              </div>
             </div>
-          )}
+          ) : null}
+
+          <div className="ui-field span-2">
+            <span className="ui-field__label">Upload ({uploadLabelByType(form.type)})</span>
+            <label className="upload-dropzone">
+              <UploadCloud size={18} />
+              <p>{uploadHintByType(form.type)}</p>
+              <input
+                type="file"
+                accept={getAcceptForType(form.type)}
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0] ?? null);
+                  setUploadStatus("idle");
+                  setUploadProgress(null);
+                }}
+                required={form.type !== "text" && !form.id && !form.existingStoragePath}
+                disabled={saving}
+              />
+              {form.existingStoragePath ? (
+                <small>
+                  Arquivo atual: <code>{form.existingStoragePath}</code>
+                </small>
+              ) : null}
+            </label>
+
+            {form.existingStoragePath ? (
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setSelectedFile(null);
+                  setForm((prev) => ({ ...prev, existingStoragePath: null }));
+                }}
+              >
+                Remover arquivo atual
+              </Button>
+            ) : null}
+
+            {uploadProgress ? (
+              <div className="upload-progress-panel" role="status" aria-live="polite">
+                <div className="upload-progress-track">
+                  <div className="upload-progress-fill" style={{ width: `${uploadProgress.percent}%` }} />
+                </div>
+                <p className="upload-progress-label">
+                  {uploadProgress.percent}% • faltam {formatMegabytes(uploadProgress.remainingBytes)} de{" "}
+                  {formatMegabytes(uploadProgress.totalBytes)}
+                </p>
+                {uploadStatus === "finalizing" ? (
+                  <p className="upload-progress-note">Finalizando cadastro...</p>
+                ) : null}
+                {uploadStatus === "cancelled" ? (
+                  <p className="upload-progress-note upload-progress-note--warning">Upload cancelado.</p>
+                ) : null}
+                {uploadStatus === "error" ? (
+                  <p className="upload-progress-note upload-progress-note--error">Falha no upload.</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {saving && uploadStatus === "uploading" && uploadAbortController ? (
+              <Button variant="outline" type="button" onClick={handleCancelUpload}>
+                Cancelar upload
+              </Button>
+            ) : null}
+          </div>
 
           <label className="checkbox-row span-2">
             <input
@@ -670,7 +798,73 @@ function getAcceptForType(type: ItemType): string {
   if (type === "pdf") return ".pdf,application/pdf";
   if (type === "audio") return "audio/*";
   if (type === "image") return "image/*";
-  return "*/*";
+  return "image/*";
+}
+
+function uploadLabelByType(type: ItemType): string {
+  if (type === "text") return "imagem opcional";
+  if (type === "image") return "imagem obrigatória";
+  return type;
+}
+
+function uploadHintByType(type: ItemType): string {
+  if (type === "text") return "Selecione uma imagem para complementar o texto (opcional)";
+  if (type === "image") return "Selecione uma imagem para upload";
+  return "Selecione um arquivo para upload";
+}
+
+function isStoragePathCompatibleWithType(storagePath: string | null, type: ItemType): boolean {
+  if (!storagePath) return true;
+  if (type === "text" || type === "image") {
+    return storagePath.startsWith("image/");
+  }
+  if (type === "pdf") {
+    return storagePath.startsWith("pdf/");
+  }
+  return storagePath.startsWith("audio/");
+}
+
+function renderMarkdownBlocks(blocks: MarkdownBlockNode[]): JSX.Element {
+  return (
+    <div className="markdown-render">
+      {blocks.map((block, index) => {
+        if (block.type === "paragraph") {
+          return (
+            <p key={`paragraph-${index}`} className="markdown-render__paragraph">
+              {renderMarkdownInlineNodes(block.inlines)}
+            </p>
+          );
+        }
+
+        return (
+          <ul key={`list-${index}`} className="markdown-render__list">
+            {block.items.map((item, itemIndex) => (
+              <li key={`list-item-${index}-${itemIndex}`}>{renderMarkdownInlineNodes(item)}</li>
+            ))}
+          </ul>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderMarkdownInlineNodes(nodes: MarkdownInlineNode[]): JSX.Element[] {
+  return nodes.map((node, index) => {
+    if (node.type === "bold") {
+      return <strong key={`bold-${index}`}>{node.text}</strong>;
+    }
+    if (node.type === "italic") {
+      return <em key={`italic-${index}`}>{node.text}</em>;
+    }
+    if (node.type === "link") {
+      return (
+        <a key={`link-${index}`} href={node.href} target="_blank" rel="noreferrer">
+          {node.text}
+        </a>
+      );
+    }
+    return <span key={`text-${index}`}>{node.text}</span>;
+  });
 }
 
 function compareItems(

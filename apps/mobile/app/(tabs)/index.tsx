@@ -26,7 +26,7 @@ export default function HomeScreen() {
       const current = stats.get(item.category_id);
       if (!current) continue;
       current.total += 1;
-      if (item.type !== "text" && downloadedMap[item.id]) {
+      if (item.storage_path && downloadedMap[item.id]) {
         current.offline += 1;
       }
     }

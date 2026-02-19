@@ -26,25 +26,25 @@ export const CategorySchema = z.object({
 
 const CatalogItemPdfSchema = CatalogItemBaseSchema.extend({
   type: z.literal("pdf"),
-  storage_path: NonEmptyStringSchema,
+  storage_path: NonEmptyStringSchema.regex(/^pdf\//, "storage_path must start with pdf/"),
   text_body: z.null().optional(),
 });
 
 const CatalogItemAudioSchema = CatalogItemBaseSchema.extend({
   type: z.literal("audio"),
-  storage_path: NonEmptyStringSchema,
+  storage_path: NonEmptyStringSchema.regex(/^audio\//, "storage_path must start with audio/"),
   text_body: z.null().optional(),
 });
 
 const CatalogItemImageSchema = CatalogItemBaseSchema.extend({
   type: z.literal("image"),
-  storage_path: NonEmptyStringSchema,
-  text_body: z.null().optional(),
+  storage_path: NonEmptyStringSchema.regex(/^image\//, "storage_path must start with image/"),
+  text_body: z.union([NonEmptyStringSchema, z.null()]).optional(),
 });
 
 const CatalogItemTextSchema = CatalogItemBaseSchema.extend({
   type: z.literal("text"),
-  storage_path: z.null().optional(),
+  storage_path: z.union([NonEmptyStringSchema.regex(/^image\//, "storage_path must start with image/"), z.null()]).optional(),
   text_body: NonEmptyStringSchema,
 });
 

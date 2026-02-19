@@ -12,6 +12,7 @@ Esta pasta versiona os scripts SQL para executar manualmente no Supabase SQL Edi
 7. `database/007_suggestions_tables.sql`
 8. `database/008_suggestions_rls.sql`
 9. `database/009_suggestions_policies.sql`
+10. `database/010_items_text_image_hybrid.sql`
 
 ## O que cada script faz
 - `001_tables.sql`: cria `public.categories` e `public.items`, checks de consistencia, funcao/trigger de `updated_at`.
@@ -23,6 +24,7 @@ Esta pasta versiona os scripts SQL para executar manualmente no Supabase SQL Edi
 - `007_suggestions_tables.sql`: cria `public.suggestions` com checks de tamanho e status.
 - `008_suggestions_rls.sql`: habilita RLS em `public.suggestions`.
 - `009_suggestions_policies.sql`: permite insert para `anon`, leitura para `authenticated` e update de `status` para `authenticated`.
+- `010_items_text_image_hybrid.sql`: permite combinacao de texto+imagem em `items` para tipos `text` e `image`, com validacao de prefixo de `storage_path`.
 
 ## Permissoes e storage
 - Os scripts assumem execucao no SQL Editor com permissao administrativa.

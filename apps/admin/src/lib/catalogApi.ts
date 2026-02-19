@@ -123,33 +123,57 @@ export async function saveItem(input: ItemInput, options?: SaveItemOptions): Pro
   const tags = normalizeTags(input.tagsInput);
   const now = new Date().toISOString();
 
-  let storagePath: string | null = input.existingStoragePath ?? null;
+  const normalizedText = normalizeOptionalText(input.textBody);
+  let storagePath = normalizeStoragePath(input.existingStoragePath);
   let textBody: string | null = null;
 
   if (input.type === "text") {
-    const normalizedText = (input.textBody ?? "").trim();
     if (!normalizedText) {
       throw new Error("Text body is required for text items.");
     }
-    textBody = normalizedText;
-    storagePath = null;
-  } else {
+
+    if (input.file && !isImageFile(input.file)) {
+      throw new Error("Text items only accept image files as optional media.");
+    }
+
     if (input.file) {
-      const extension = resolveFileExtension(input.file);
-      const expectedPrefix = `${input.type}/${itemId}`;
-      const reusePath =
-        storagePath && storagePath.startsWith(expectedPrefix) ? storagePath : `${expectedPrefix}.${extension}`;
+      storagePath = await uploadItemFile(itemId, "image", input.file, storagePath, options);
+    }
 
-      await uploadFileWithProgress(reusePath, input.file, {
-        onProgress: options?.onUploadProgress,
-        signal: options?.signal,
-      });
+    if (storagePath && !storagePath.startsWith("image/")) {
+      storagePath = null;
+    }
 
-      storagePath = reusePath;
+    textBody = normalizedText;
+  } else if (input.type === "image") {
+    if (input.file && !isImageFile(input.file)) {
+      throw new Error("Image items only accept image files.");
+    }
+
+    if (input.file) {
+      storagePath = await uploadItemFile(itemId, "image", input.file, storagePath, options);
     }
 
     if (!storagePath) {
-      throw new Error("File upload is required for pdf, audio or image items.");
+      throw new Error("Image upload is required for image items.");
+    }
+
+    if (!storagePath.startsWith("image/")) {
+      throw new Error("Invalid image storage path.");
+    }
+
+    textBody = normalizedText;
+  } else {
+    if (input.file) {
+      storagePath = await uploadItemFile(itemId, input.type, input.file, storagePath, options);
+    }
+
+    if (!storagePath) {
+      throw new Error("File upload is required for pdf or audio items.");
+    }
+
+    if (!storagePath.startsWith(`${input.type}/`)) {
+      throw new Error(`Invalid storage path for ${input.type} item.`);
     }
 
     textBody = null;
@@ -220,6 +244,46 @@ function normalizeTags(tagsInput?: string): string[] | null {
     .filter((tag) => tag.length > 0);
 
   return values.length > 0 ? values : null;
+}
+
+function normalizeStoragePath(path?: string | null): string | null {
+  const normalized = path?.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeOptionalText(value?: string): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function isImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) {
+    return true;
+  }
+  const extension = resolveFileExtension(file);
+  return ["jpg", "jpeg", "png", "webp", "svg", "gif", "bmp", "avif"].includes(extension);
+}
+
+async function uploadItemFile(
+  itemId: string,
+  uploadType: "pdf" | "audio" | "image",
+  file: File,
+  existingStoragePath: string | null,
+  options?: SaveItemOptions,
+): Promise<string> {
+  const extension = resolveFileExtension(file);
+  const expectedPrefix = `${uploadType}/${itemId}`;
+  const reusePath =
+    existingStoragePath && existingStoragePath.startsWith(expectedPrefix)
+      ? existingStoragePath
+      : `${expectedPrefix}.${extension}`;
+
+  await uploadFileWithProgress(reusePath, file, {
+    onProgress: options?.onUploadProgress,
+    signal: options?.signal,
+  });
+
+  return reusePath;
 }
 
 function resolveFileExtension(file: File): string {

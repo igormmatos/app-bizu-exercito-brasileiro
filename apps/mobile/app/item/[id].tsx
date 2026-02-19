@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, Image } from "react-native";
 import { Screen } from "@/src/components/layout";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
@@ -11,6 +11,7 @@ import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "
 import { addRecentItem } from "@/src/lib/recentCache";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
+import { parseSimpleMarkdown, type MarkdownInlineNode } from "@bizu/shared";
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,25 +23,32 @@ export default function ItemDetailScreen() {
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [offlineSizeLabel, setOfflineSizeLabel] = useState("-- MB");
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+  const [progressTrackWidth, setProgressTrackWidth] = useState(0);
 
   const downloadedEntry = item ? downloadedMap[item.id] : undefined;
   const isDownloaded = Boolean(downloadedEntry);
-  const isMediaItem = Boolean(item && item.type !== "text" && item.storage_path);
-  const remoteUrl = isMediaItem && item?.storage_path ? getPublicContentUrl(item.storage_path) : null;
-  const audioSource = item?.type === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
+  const mediaType = item ? resolveMediaType(item.type, item.storage_path) : null;
+  const isMediaItem = Boolean(mediaType && item?.storage_path);
+  const remoteUrl = item?.storage_path ? getPublicContentUrl(item.storage_path) : null;
+  const imageSourceUri = mediaType === "image" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
+  const audioSource = mediaType === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
   const audioPlayer = useAudioPlayer(audioSource ?? null);
   const audioStatus = useAudioPlayerStatus(audioPlayer);
 
   const audioDuration = Math.max(0, audioStatus.duration ?? 0);
   const audioCurrentTime = Math.max(0, Math.min(audioStatus.currentTime ?? 0, audioDuration || 0));
-  const audioProgress = audioDuration > 0 ? audioCurrentTime / audioDuration : 0;
+  const displayedAudioTime = isScrubbing && scrubTime !== null ? scrubTime : audioCurrentTime;
+  const audioProgress = audioDuration > 0 ? Math.max(0, Math.min(1, displayedAudioTime / audioDuration)) : 0;
+  const textContent = item?.text_body?.trim() ?? "";
+  const textBlocks = useMemo(() => parseSimpleMarkdown(textContent), [textContent]);
   const lyricsText = useMemo(() => {
-    if (!item || item.type !== "audio") {
+    if (!item || mediaType !== "audio") {
       return "";
     }
-    const audioTextBody = (item as { text_body?: string | null }).text_body;
-    return audioTextBody?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
-  }, [item]);
+    return item.text_body?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
+  }, [item, mediaType]);
 
   useEffect(() => {
     let active = true;
@@ -79,24 +87,27 @@ export default function ItemDetailScreen() {
 
   useEffect(() => {
     setRepeatEnabled(false);
+    setIsScrubbing(false);
+    setScrubTime(null);
+    setProgressTrackWidth(0);
   }, [item?.id]);
 
   useEffect(() => {
-    if (item?.type !== "audio") {
+    if (mediaType !== "audio") {
       return;
     }
     audioPlayer.loop = repeatEnabled;
-  }, [audioPlayer, item?.type, repeatEnabled]);
+  }, [audioPlayer, mediaType, repeatEnabled]);
 
   async function handleDownload() {
-    if (!item || item.type === "text" || !item.storage_path) {
+    if (!item || !item.storage_path || !mediaType) {
       return;
     }
 
     setBusy(true);
     setMessage(null);
     try {
-      await downloadItemMedia(item.id, item.storage_path, item.type as DownloadableMediaType);
+      await downloadItemMedia(item.id, item.storage_path, mediaType);
       await reloadDownloads();
       setMessage("Download concluído.");
     } catch (error) {
@@ -112,7 +123,7 @@ export default function ItemDetailScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      if (item.type === "audio") {
+      if (mediaType === "audio") {
         audioPlayer.pause();
         await audioPlayer.seekTo(0);
       }
@@ -127,7 +138,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleOpenPreferred() {
-    if (!item || item.type === "text" || !remoteUrl) return;
+    if (!item || !remoteUrl || !mediaType) return;
 
     setBusy(true);
     setMessage(null);
@@ -135,7 +146,7 @@ export default function ItemDetailScreen() {
       if (downloadedEntry?.localUri) {
         const info = await FileSystem.getInfoAsync(downloadedEntry.localUri);
         if (info.exists) {
-          if (item.type === "pdf") {
+          if (mediaType === "pdf") {
             router.push({
               pathname: "/pdf",
               params: {
@@ -152,7 +163,7 @@ export default function ItemDetailScreen() {
         await reloadDownloads();
       }
 
-      if (item.type === "pdf") {
+      if (mediaType === "pdf") {
         router.push({
           pathname: "/pdf",
           params: {
@@ -191,7 +202,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioPlayPause() {
-    if (!item || item.type !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !remoteUrl) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -217,7 +228,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioForwardFiveSeconds() {
-    if (!item || item.type !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !remoteUrl) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -233,7 +244,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioBackwardFiveSeconds() {
-    if (!item || item.type !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !remoteUrl) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -247,6 +258,80 @@ export default function ItemDetailScreen() {
       setAudioBusy(false);
     }
   }
+
+  async function handleAudioRestart() {
+    if (!item || mediaType !== "audio" || !remoteUrl) return;
+
+    setAudioBusy(true);
+    setMessage(null);
+    try {
+      await audioPlayer.seekTo(0);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao reiniciar áudio."));
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  function previewScrubAt(locationX: number) {
+    if (audioDuration <= 0 || progressTrackWidth <= 0) {
+      return;
+    }
+    const clampedX = Math.max(0, Math.min(locationX, progressTrackWidth));
+    const nextTime = (clampedX / progressTrackWidth) * audioDuration;
+    setIsScrubbing(true);
+    setScrubTime(nextTime);
+  }
+
+  async function commitScrubAt(locationX: number) {
+    if (!item || mediaType !== "audio" || !remoteUrl) {
+      return;
+    }
+
+    if (audioDuration <= 0 || progressTrackWidth <= 0) {
+      setIsScrubbing(false);
+      setScrubTime(null);
+      return;
+    }
+
+    const clampedX = Math.max(0, Math.min(locationX, progressTrackWidth));
+    const nextTime = (clampedX / progressTrackWidth) * audioDuration;
+    setIsScrubbing(false);
+    setScrubTime(nextTime);
+    setAudioBusy(true);
+    setMessage(null);
+
+    try {
+      await audioPlayer.seekTo(nextTime);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao ajustar posição do áudio."));
+    } finally {
+      setAudioBusy(false);
+      setScrubTime(null);
+    }
+  }
+
+  const progressPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => audioDuration > 0,
+        onMoveShouldSetPanResponder: () => audioDuration > 0,
+        onPanResponderGrant: (event) => {
+          previewScrubAt(event.nativeEvent.locationX);
+        },
+        onPanResponderMove: (event) => {
+          previewScrubAt(event.nativeEvent.locationX);
+        },
+        onPanResponderRelease: (event) => {
+          void commitScrubAt(event.nativeEvent.locationX);
+        },
+        onPanResponderTerminate: () => {
+          setIsScrubbing(false);
+          setScrubTime(null);
+        },
+      }),
+    [audioDuration, progressTrackWidth, mediaType, item?.id, remoteUrl, audioPlayer],
+  );
 
   async function handleToggleFavorite() {
     if (!item) return;
@@ -301,9 +386,18 @@ export default function ItemDetailScreen() {
               />
             ) : null}
 
-            {item.type === "audio" ? (
+            {mediaType === "audio" ? (
               <Card style={styles.audioCard}>
                 <View style={styles.audioTransportBar}>
+                  <Pressable
+                    style={({ pressed }) => [styles.transportButton, pressed ? styles.transportButtonPressed : null]}
+                    onPress={() => void handleAudioRestart()}
+                    disabled={audioBusy}
+                  >
+                    <Ionicons name="refresh" size={17} color={colors.gray700} />
+                    <Text style={styles.transportButtonLabel}>0:00</Text>
+                  </Pressable>
+
                   <Pressable
                     style={({ pressed }) => [styles.transportButton, pressed ? styles.transportButtonPressed : null]}
                     onPress={() => void handleAudioBackwardFiveSeconds()}
@@ -358,12 +452,29 @@ export default function ItemDetailScreen() {
                   </Pressable>
                 </View>
 
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, audioProgress)) * 100}%` }]} />
+                <View
+                  style={styles.progressTrack}
+                  onLayout={(event) => setProgressTrackWidth(event.nativeEvent.layout.width)}
+                  {...progressPanResponder.panHandlers}
+                >
+                  <View style={[styles.progressFill, { width: `${audioProgress * 100}%` }]} />
+                  {audioDuration > 0 ? (
+                    <View
+                      style={[
+                        styles.progressThumb,
+                        {
+                          left: Math.max(
+                            0,
+                            Math.min(Math.max(progressTrackWidth - 16, 0), audioProgress * progressTrackWidth - 8),
+                          ),
+                        },
+                      ]}
+                    />
+                  ) : null}
                 </View>
 
                 <View style={styles.timeRow}>
-                  <Text style={styles.timeText}>{formatSeconds(audioCurrentTime)}</Text>
+                  <Text style={styles.timeText}>{formatSeconds(displayedAudioTime)}</Text>
                   <Text style={styles.timeText}>{formatSeconds(audioDuration)}</Text>
                 </View>
 
@@ -376,9 +487,23 @@ export default function ItemDetailScreen() {
               </Card>
             ) : null}
 
-            {item.type === "text" ? (
+            {(item.type === "text" || (item.type === "image" && textBlocks.length > 0)) ? (
               <Card>
-                <Text style={styles.textBody}>{item.text_body ?? "Sem conteúdo textual."}</Text>
+                {textBlocks.length > 0 ? (
+                  <View style={styles.markdownRoot}>{renderMarkdownBlocks(textBlocks)}</View>
+                ) : (
+                  <Text style={styles.textBody}>Sem conteúdo textual.</Text>
+                )}
+              </Card>
+            ) : null}
+
+            {item.type === "text" && mediaType === "image" ? (
+              <Card style={styles.inlineImageCard}>
+                {imageSourceUri ? (
+                  <Image source={{ uri: imageSourceUri }} style={styles.inlineImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.metaText}>Imagem indisponível.</Text>
+                )}
               </Card>
             ) : null}
 
@@ -460,12 +585,13 @@ const styles = StyleSheet.create({
   audioTransportBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     gap: 8,
+    flexWrap: "wrap",
   },
   transportButton: {
     minHeight: 44,
-    minWidth: 44,
+    width: 56,
     borderRadius: 11,
     borderWidth: 1,
     borderColor: colors.gray300,
@@ -475,7 +601,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
-    flex: 1,
   },
   transportButtonPressed: {
     backgroundColor: colors.gray100,
@@ -503,7 +628,7 @@ const styles = StyleSheet.create({
   },
   transportRepeatButton: {
     minHeight: 44,
-    minWidth: 60,
+    width: 56,
     borderRadius: 11,
     borderWidth: 1,
     borderColor: colors.gray300,
@@ -527,15 +652,27 @@ const styles = StyleSheet.create({
     color: colors.army700,
   },
   progressTrack: {
-    height: 4,
+    height: 12,
     backgroundColor: colors.gray300,
     borderRadius: 999,
     overflow: "hidden",
     marginTop: 4,
+    position: "relative",
+    justifyContent: "center",
   },
   progressFill: {
-    height: 4,
+    height: 12,
     backgroundColor: colors.army600,
+  },
+  progressThumb: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.army700,
+    top: -2,
   },
   timeRow: {
     flexDirection: "row",
@@ -578,6 +715,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
   },
+  markdownRoot: {
+    gap: 8,
+  },
+  markdownParagraph: {
+    color: colors.gray700,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  markdownList: {
+    gap: 6,
+  },
+  markdownListItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  markdownBullet: {
+    color: colors.gray700,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  markdownListText: {
+    flex: 1,
+    color: colors.gray700,
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  markdownBold: {
+    fontWeight: "700",
+  },
+  markdownItalic: {
+    fontStyle: "italic",
+  },
+  markdownLink: {
+    color: "#1D4ED8",
+    textDecorationLine: "underline",
+  },
+  inlineImageCard: {
+    padding: 0,
+    overflow: "hidden",
+  },
+  inlineImage: {
+    width: "100%",
+    height: 230,
+  },
   offlineHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -613,4 +795,82 @@ function toMessage(error: unknown, fallback: string): string {
     return `${fallback} ${error.message}`;
   }
   return fallback;
+}
+
+function resolveMediaType(
+  itemType: "pdf" | "audio" | "image" | "text",
+  storagePath?: string | null,
+): DownloadableMediaType | null {
+  if (!storagePath) {
+    return null;
+  }
+
+  if (itemType === "pdf" || itemType === "audio" || itemType === "image") {
+    return itemType;
+  }
+
+  if (itemType === "text" && storagePath.startsWith("image/")) {
+    return "image";
+  }
+
+  return null;
+}
+
+function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
+  return blocks.map((block, blockIndex) => {
+    if (block.type === "paragraph") {
+      return (
+        <Text key={`paragraph-${blockIndex}`} style={styles.markdownParagraph}>
+          {renderMarkdownInline(block.inlines)}
+        </Text>
+      );
+    }
+
+    return (
+      <View key={`list-${blockIndex}`} style={styles.markdownList}>
+        {block.items.map((item, itemIndex) => (
+          <View key={`list-item-${blockIndex}-${itemIndex}`} style={styles.markdownListItem}>
+            <Text style={styles.markdownBullet}>•</Text>
+            <Text style={styles.markdownListText}>{renderMarkdownInline(item)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  });
+}
+
+function renderMarkdownInline(nodes: MarkdownInlineNode[]) {
+  return nodes.map((node, index) => {
+    if (node.type === "bold") {
+      return (
+        <Text key={`bold-${index}`} style={styles.markdownBold}>
+          {node.text}
+        </Text>
+      );
+    }
+
+    if (node.type === "italic") {
+      return (
+        <Text key={`italic-${index}`} style={styles.markdownItalic}>
+          {node.text}
+        </Text>
+      );
+    }
+
+    if (node.type === "link") {
+      return (
+        <Text
+          key={`link-${index}`}
+          style={styles.markdownLink}
+          onPress={() => {
+            void Linking.openURL(node.href);
+          }}
+        >
+          {node.text}
+        </Text>
+      );
+    }
+
+    return <Text key={`text-${index}`}>{node.text}</Text>;
+  });
 }

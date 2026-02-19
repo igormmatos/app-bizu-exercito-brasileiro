@@ -232,7 +232,7 @@ export default function CategoryItemsScreen() {
                 }
                 trailing={
                   <View style={styles.trailingWrap}>
-                    {item.type !== "text" && downloadedMap[item.id] ? (
+                    {item.storage_path && downloadedMap[item.id] ? (
                       <PillBadge label="Offline" tone="success" style={styles.offlineBadge} />
                     ) : null}
                     <Pressable

@@ -171,9 +171,9 @@ export function SuggestionsManager() {
               className="ui-select"
             >
               <option value="all">Todos</option>
-              <option value="new">new</option>
-              <option value="triaged">triaged</option>
-              <option value="done">done</option>
+              <option value="new">{statusLabel("new")}</option>
+              <option value="triaged">{statusLabel("triaged")}</option>
+              <option value="done">{statusLabel("done")}</option>
             </select>
           </label>
 
@@ -229,7 +229,7 @@ export function SuggestionsManager() {
                 <tr key={suggestion.id}>
                   <td>{formatDate(suggestion.created_at)}</td>
                   <td>
-                    <Badge variant={statusBadgeVariant(suggestion.status)}>{suggestion.status}</Badge>
+                    <Badge variant={statusBadgeVariant(suggestion.status)}>{statusLabel(suggestion.status)}</Badge>
                   </td>
                   <td>{suggestion.category ?? "-"}</td>
                   <td>{suggestion.contact ?? "-"}</td>
@@ -279,7 +279,7 @@ export function SuggestionsManager() {
                 <strong>Criada em:</strong> {formatDate(selected.created_at)}
               </div>
               <div>
-                <strong>Status:</strong> <Badge variant={statusBadgeVariant(selected.status)}>{selected.status}</Badge>
+                <strong>Status:</strong> <Badge variant={statusBadgeVariant(selected.status)}>{statusLabel(selected.status)}</Badge>
               </div>
               <div>
                 <strong>Categoria:</strong> {selected.category ?? "-"}
@@ -308,9 +308,9 @@ export function SuggestionsManager() {
                 disabled={statusReadOnly}
                 className="ui-select"
               >
-                <option value="new">new</option>
-                <option value="triaged">triaged</option>
-                <option value="done">done</option>
+                <option value="new">{statusLabel("new")}</option>
+                <option value="triaged">{statusLabel("triaged")}</option>
+                <option value="done">{statusLabel("done")}</option>
               </select>
             </label>
 
@@ -329,6 +329,12 @@ function statusBadgeVariant(status: SuggestionStatus): "success" | "warning" | "
   if (status === "done") return "success";
   if (status === "triaged") return "info";
   return "warning";
+}
+
+function statusLabel(status: SuggestionStatus): string {
+  if (status === "new") return "Novo";
+  if (status === "triaged") return "Triada";
+  return "Concluída";
 }
 
 function formatDate(value: string): string {

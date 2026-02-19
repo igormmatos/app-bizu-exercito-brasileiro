@@ -1,6 +1,6 @@
-import { FileText, Image as ImageIcon, Music, Pause, Play, Star } from "lucide-react";
+import { FileText, Image as ImageIcon, Pause, Play, PlayIcon, Repeat, RotateCcw, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { CatalogItem, ItemType } from "@bizu/shared";
+import { parseSimpleMarkdown, type CatalogItem, type MarkdownInlineNode } from "@bizu/shared";
 import { getPublicFileUrl } from "../lib/catalogApi";
 import { Modal } from "./ui";
 
@@ -12,14 +12,19 @@ type ItemPreviewModalProps = {
 export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
   if (!item) return null;
 
-  const mediaUrl = item.type !== "text" && item.storage_path ? getPublicFileUrl(item.storage_path) : null;
+  const mediaType = resolveMediaType(item);
+  const mediaUrl = mediaType && item.storage_path ? getPublicFileUrl(item.storage_path) : null;
   const audioLyrics = resolveAudioLyrics(item);
+  const textBody = item.text_body?.trim() ?? "";
+  const markdownBlocks = parseSimpleMarkdown(textBody);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
 
   useEffect(() => {
     setIsFavorited(false);
     setIsAudioPlaying(false);
+    setRepeatEnabled(false);
   }, [item.id]);
 
   return (
@@ -39,10 +44,9 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
             </button>
           </div>
 
-          {item.type !== "text" ? <PreviewPlaceholder type={item.type} /> : null}
+          {item.type === "pdf" || item.type === "image" ? <PreviewPlaceholder type={item.type} /> : null}
 
           <h3 className="mobile-preview-title">{item.title}</h3>
-          <p className="mobile-preview-subtitle">{item.description ?? "Sem descrição cadastrada."}</p>
 
           {item.type === "pdf" ? (
             <a
@@ -74,11 +78,34 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
             </a>
           ) : null}
 
-          {item.type === "audio" ? (
+          {mediaType === "audio" ? (
             <div className="mobile-preview-card mobile-preview-audio-card">
-              <button type="button" className="mobile-preview-play-circle" onClick={() => setIsAudioPlaying((prev) => !prev)}>
-                {isAudioPlaying ? <Pause size={25} /> : <Play size={25} />}
-              </button>
+              <div className="mobile-preview-audio-transport">
+                <button type="button" className="mobile-preview-transport-btn" aria-label="Reiniciar faixa">
+                  <RotateCcw size={16} />
+                  <span>0:00</span>
+                </button>
+                <button type="button" className="mobile-preview-transport-btn" aria-label="Voltar cinco segundos">
+                  <PlayIcon size={16} className="is-backward" />
+                  <span>-5s</span>
+                </button>
+                <button type="button" className="mobile-preview-play-circle" onClick={() => setIsAudioPlaying((prev) => !prev)}>
+                  {isAudioPlaying ? <Pause size={24} /> : <Play size={24} />}
+                </button>
+                <button type="button" className="mobile-preview-transport-btn" aria-label="Avançar cinco segundos">
+                  <PlayIcon size={16} />
+                  <span>+5s</span>
+                </button>
+                <button
+                  type="button"
+                  className={`mobile-preview-transport-btn ${repeatEnabled ? "is-repeat-enabled" : ""}`}
+                  onClick={() => setRepeatEnabled((prev) => !prev)}
+                  aria-label="Alternar repetição"
+                >
+                  <Repeat size={16} />
+                  <span>{repeatEnabled ? "ON" : "OFF"}</span>
+                </button>
+              </div>
 
               <div className="mobile-preview-progress-track">
                 <div
@@ -99,13 +126,23 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
             </div>
           ) : null}
 
-          {item.type === "text" ? (
+          {(item.type === "text" || (item.type === "image" && textBody)) ? (
             <div className="mobile-preview-card">
-              <p className="mobile-preview-text-body">{item.text_body ?? "Sem conteúdo textual."}</p>
+              {markdownBlocks.length > 0 ? renderMarkdownBlocks(markdownBlocks) : <p className="mobile-preview-text-body">Sem conteúdo textual.</p>}
             </div>
           ) : null}
 
-          {item.type !== "text" ? (
+          {item.type === "text" && mediaType === "image" ? (
+            <div className="mobile-preview-card mobile-preview-inline-image-card">
+              {mediaUrl ? (
+                <img src={mediaUrl} alt={item.title} className="mobile-preview-inline-image" />
+              ) : (
+                <p className="mobile-preview-message">Imagem indisponível para pré-visualização.</p>
+              )}
+            </div>
+          ) : null}
+
+          {mediaType ? (
             <div className="mobile-preview-card">
               <div className="mobile-preview-offline-head">
                 <strong>Disponibilidade Offline</strong>
@@ -116,22 +153,24 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
                 Baixar para Offline
               </button>
 
-              <a
-                className={["mobile-preview-outline-btn", mediaUrl ? "" : "is-disabled"].join(" ").trim()}
-                href={mediaUrl ?? undefined}
-                target="_blank"
-                rel="noreferrer"
-                aria-disabled={!mediaUrl}
-                onClick={(event) => {
-                  if (!mediaUrl) event.preventDefault();
-                }}
-              >
-                Abrir remoto
-              </a>
+              {item.type === "pdf" || item.type === "image" ? (
+                <a
+                  className={["mobile-preview-outline-btn", mediaUrl ? "" : "is-disabled"].join(" ").trim()}
+                  href={mediaUrl ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!mediaUrl}
+                  onClick={(event) => {
+                    if (!mediaUrl) event.preventDefault();
+                  }}
+                >
+                  Abrir remoto
+                </a>
+              ) : null}
             </div>
           ) : null}
 
-          {!mediaUrl && item.type !== "text" ? (
+          {!mediaUrl && mediaType ? (
             <div className="mobile-preview-card">
               <p className="mobile-preview-message">Arquivo indisponível para pré-visualização.</p>
             </div>
@@ -148,10 +187,9 @@ export function ItemPreviewModal({ item, onClose }: ItemPreviewModalProps) {
   );
 }
 
-function PreviewPlaceholder({ type }: { type: ItemType }) {
-  const label = type === "audio" ? "AUDIO PREVIEW" : type === "pdf" ? "PDF PREVIEW" : "IMAGE PREVIEW";
-  const icon =
-    type === "audio" ? <Music size={42} /> : type === "pdf" ? <FileText size={42} /> : <ImageIcon size={42} />;
+function PreviewPlaceholder({ type }: { type: "pdf" | "image" }) {
+  const label = type === "pdf" ? "PDF PREVIEW" : "IMAGE PREVIEW";
+  const icon = type === "pdf" ? <FileText size={42} /> : <ImageIcon size={42} />;
 
   return (
     <div className="mobile-preview-placeholder">
@@ -163,6 +201,61 @@ function PreviewPlaceholder({ type }: { type: ItemType }) {
 
 function resolveAudioLyrics(item: CatalogItem): string {
   if (item.type !== "audio") return "";
-  const textBody = (item as { text_body?: string | null }).text_body;
-  return textBody?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
+  return item.text_body?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
+}
+
+function resolveMediaType(item: CatalogItem): "pdf" | "audio" | "image" | null {
+  if (!item.storage_path) {
+    return null;
+  }
+  if (item.type === "pdf" || item.type === "audio" || item.type === "image") {
+    return item.type;
+  }
+  if (item.type === "text" && item.storage_path.startsWith("image/")) {
+    return "image";
+  }
+  return null;
+}
+
+function renderMarkdownBlocks(blocks: ReturnType<typeof parseSimpleMarkdown>) {
+  return (
+    <div className="mobile-preview-markdown">
+      {blocks.map((block, index) => {
+        if (block.type === "paragraph") {
+          return (
+            <p key={`paragraph-${index}`} className="mobile-preview-markdown__paragraph">
+              {renderMarkdownInline(block.inlines)}
+            </p>
+          );
+        }
+
+        return (
+          <ul key={`list-${index}`} className="mobile-preview-markdown__list">
+            {block.items.map((item, itemIndex) => (
+              <li key={`list-item-${index}-${itemIndex}`}>{renderMarkdownInline(item)}</li>
+            ))}
+          </ul>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderMarkdownInline(nodes: MarkdownInlineNode[]) {
+  return nodes.map((node, index) => {
+    if (node.type === "bold") {
+      return <strong key={`bold-${index}`}>{node.text}</strong>;
+    }
+    if (node.type === "italic") {
+      return <em key={`italic-${index}`}>{node.text}</em>;
+    }
+    if (node.type === "link") {
+      return (
+        <a key={`link-${index}`} href={node.href} target="_blank" rel="noreferrer">
+          {node.text}
+        </a>
+      );
+    }
+    return <span key={`text-${index}`}>{node.text}</span>;
+  });
 }

@@ -18,7 +18,6 @@ export type BatchController = {
 };
 
 type DownloadableItem = CatalogItem & {
-  type: DownloadableMediaType;
   storage_path: string;
 };
 
@@ -82,7 +81,11 @@ export async function downloadCategory(
     });
 
     try {
-      await downloadItemMedia(item.id, item.storage_path, item.type);
+      const mediaType = resolveDownloadableType(item);
+      if (!mediaType) {
+        throw new Error("Tipo de mídia não suportado para download.");
+      }
+      await downloadItemMedia(item.id, item.storage_path, mediaType);
       okCount += 1;
     } catch {
       failCount += 1;
@@ -176,9 +179,21 @@ export async function removeCategoryDownloads(
 }
 
 function isDownloadableItem(item: CatalogItem): item is DownloadableItem {
+  return Boolean(resolveDownloadableType(item));
+}
+
+function resolveDownloadableType(item: CatalogItem): DownloadableMediaType | null {
   if (!item.storage_path) {
-    return false;
+    return null;
   }
 
-  return item.type === "pdf" || item.type === "audio" || item.type === "image";
+  if (item.type === "pdf" || item.type === "audio" || item.type === "image") {
+    return item.type;
+  }
+
+  if (item.type === "text" && item.storage_path.startsWith("image/")) {
+    return "image";
+  }
+
+  return null;
 }
