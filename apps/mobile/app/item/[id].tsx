@@ -19,6 +19,7 @@ export default function ItemDetailScreen() {
   const item = items.find((entry) => entry.id === id);
   const [busy, setBusy] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [offlineSizeLabel, setOfflineSizeLabel] = useState("-- MB");
 
@@ -75,6 +76,17 @@ export default function ItemDetailScreen() {
     }
     void addRecentItem(item.id);
   }, [item?.id]);
+
+  useEffect(() => {
+    setRepeatEnabled(false);
+  }, [item?.id]);
+
+  useEffect(() => {
+    if (item?.type !== "audio") {
+      return;
+    }
+    audioPlayer.loop = repeatEnabled;
+  }, [audioPlayer, item?.type, repeatEnabled]);
 
   async function handleDownload() {
     if (!item || item.type === "text" || !item.storage_path) {
@@ -160,7 +172,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleOpenRemote() {
-    if (!remoteUrl || !item || item.type === "text") return;
+    if (!remoteUrl || !item || (item.type !== "pdf" && item.type !== "image")) return;
     try {
       if (item.type === "pdf") {
         router.push({
@@ -204,6 +216,38 @@ export default function ItemDetailScreen() {
     }
   }
 
+  async function handleAudioForwardFiveSeconds() {
+    if (!item || item.type !== "audio" || !remoteUrl) return;
+
+    setAudioBusy(true);
+    setMessage(null);
+    try {
+      const current = Math.max(0, audioStatus.currentTime ?? 0);
+      const nextTime = audioDuration > 0 ? Math.min(audioDuration, current + 5) : current + 5;
+      await audioPlayer.seekTo(nextTime);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao avançar áudio."));
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  async function handleAudioBackwardFiveSeconds() {
+    if (!item || item.type !== "audio" || !remoteUrl) return;
+
+    setAudioBusy(true);
+    setMessage(null);
+    try {
+      const current = Math.max(0, audioStatus.currentTime ?? 0);
+      const nextTime = Math.max(0, current - 5);
+      await audioPlayer.seekTo(nextTime);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao retroceder áudio."));
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
   async function handleToggleFavorite() {
     if (!item) return;
     try {
@@ -237,12 +281,9 @@ export default function ItemDetailScreen() {
               </Pressable>
             </View>
 
-            {item.type !== "text" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
+            {item.type === "pdf" || item.type === "image" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
 
             <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.subtitle} numberOfLines={2}>
-              {item.description ?? "Sem descrição cadastrada."}
-            </Text>
 
             {item.type === "pdf" ? (
               <PrimaryButton
@@ -262,18 +303,60 @@ export default function ItemDetailScreen() {
 
             {item.type === "audio" ? (
               <Card style={styles.audioCard}>
-                <Pressable
-                  style={({ pressed }) => [styles.playCircle, pressed ? styles.playCirclePressed : null]}
-                  onPress={() => void handleAudioPlayPause()}
-                  disabled={audioBusy}
-                >
-                  <Ionicons
-                    name={audioStatus.playing ? "pause" : "play"}
-                    size={26}
-                    color={colors.white}
-                    style={styles.playIcon}
-                  />
-                </Pressable>
+                <View style={styles.audioTransportBar}>
+                  <Pressable
+                    style={({ pressed }) => [styles.transportButton, pressed ? styles.transportButtonPressed : null]}
+                    onPress={() => void handleAudioBackwardFiveSeconds()}
+                    disabled={audioBusy}
+                  >
+                    <Ionicons name="play-back" size={18} color={colors.gray700} />
+                    <Text style={styles.transportButtonLabel}>-5s</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.transportPrimaryButton,
+                      pressed ? styles.transportPrimaryButtonPressed : null,
+                    ]}
+                    onPress={() => void handleAudioPlayPause()}
+                    disabled={audioBusy}
+                  >
+                    <Ionicons name={audioStatus.playing ? "pause" : "play"} size={22} color={colors.white} />
+                  </Pressable>
+
+                  <Pressable
+                    style={({ pressed }) => [styles.transportButton, pressed ? styles.transportButtonPressed : null]}
+                    onPress={() => void handleAudioForwardFiveSeconds()}
+                    disabled={audioBusy}
+                  >
+                    <Ionicons name="play-forward" size={18} color={colors.gray700} />
+                    <Text style={styles.transportButtonLabel}>+5s</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.transportRepeatButton,
+                      repeatEnabled ? styles.transportRepeatButtonActive : null,
+                      pressed ? styles.transportButtonPressed : null,
+                    ]}
+                    onPress={() => setRepeatEnabled((prev) => !prev)}
+                    disabled={audioBusy}
+                  >
+                    <Ionicons
+                      name="repeat"
+                      size={18}
+                      color={repeatEnabled ? colors.army700 : colors.gray700}
+                    />
+                    <Text
+                      style={[
+                        styles.transportRepeatLabel,
+                        repeatEnabled ? styles.transportRepeatLabelActive : null,
+                      ]}
+                    >
+                      {repeatEnabled ? "ON" : "OFF"}
+                    </Text>
+                  </Pressable>
+                </View>
 
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(1, audioProgress)) * 100}%` }]} />
@@ -320,7 +403,9 @@ export default function ItemDetailScreen() {
                   />
                 )}
 
-                <OutlineButton label="Abrir remoto" onPress={() => void handleOpenRemote()} disabled={busy} />
+                {item.type === "pdf" || item.type === "image" ? (
+                  <OutlineButton label="Abrir remoto" onPress={() => void handleOpenRemote()} disabled={busy} />
+                ) : null}
               </Card>
             ) : null}
 
@@ -369,33 +454,77 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     fontWeight: "700",
   },
-  subtitle: {
-    fontSize: 14,
-    color: colors.gray500,
-    marginTop: -2,
-  },
   audioCard: {
     gap: 10,
   },
-  playCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 999,
-    alignSelf: "center",
+  audioTransportBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  transportButton: {
+    minHeight: 44,
+    minWidth: 44,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    backgroundColor: colors.white,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.army600,
+    gap: 2,
+    flex: 1,
+  },
+  transportButtonPressed: {
+    backgroundColor: colors.gray100,
+  },
+  transportButtonLabel: {
+    color: colors.gray700,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  transportPrimaryButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.army700,
     shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 2,
   },
-  playCirclePressed: {
-    backgroundColor: colors.army700,
+  transportPrimaryButtonPressed: {
+    backgroundColor: colors.army600,
   },
-  playIcon: {
-    marginLeft: 2,
+  transportRepeatButton: {
+    minHeight: 44,
+    minWidth: 60,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    backgroundColor: colors.white,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  transportRepeatButtonActive: {
+    borderColor: colors.army600,
+    backgroundColor: colors.army100,
+  },
+  transportRepeatLabel: {
+    color: colors.gray700,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  transportRepeatLabelActive: {
+    color: colors.army700,
   },
   progressTrack: {
     height: 4,

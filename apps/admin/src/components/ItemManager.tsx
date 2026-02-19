@@ -1,4 +1,4 @@
-import { ArrowUpDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CatalogItem, Category, ItemType } from "@bizu/shared";
 import {
@@ -7,8 +7,11 @@ import {
   fetchItems,
   getPublicFileUrl,
   saveItem,
+  updateItemPublished,
   type ItemPublishedFilter,
+  type UploadProgressInfo,
 } from "../lib/catalogApi";
+import { ItemPreviewModal } from "./ItemPreviewModal";
 import { Badge, Button, Card, Input, Modal } from "./ui";
 
 type ItemFormState = {
@@ -37,6 +40,7 @@ const EMPTY_FORM: ItemFormState = {
 
 type SortKey = "title" | "category" | "type" | "published" | "updated_at";
 type SortDirection = "asc" | "desc";
+type UploadStatus = "idle" | "uploading" | "finalizing" | "error" | "cancelled";
 
 export function ItemManager() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -50,10 +54,15 @@ export function ItemManager() {
   const [filterPublished, setFilterPublished] = useState<ItemPublishedFilter>("all");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<CatalogItem | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("updated_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
+  const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
+  const [updatingPublishedIds, setUpdatingPublishedIds] = useState<Set<string>>(new Set());
 
   const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category.name])), [categories]);
   const visibleItems = useMemo(() => {
@@ -116,6 +125,7 @@ export function ItemManager() {
   function openNew() {
     setForm(EMPTY_FORM);
     setSelectedFile(null);
+    resetUploadState();
     setModalOpen(true);
   }
 
@@ -132,7 +142,26 @@ export function ItemManager() {
       existingStoragePath: item.storage_path ?? null,
     });
     setSelectedFile(null);
+    resetUploadState();
     setModalOpen(true);
+  }
+
+  function resetUploadState() {
+    setUploadStatus("idle");
+    setUploadProgress(null);
+    setUploadAbortController(null);
+  }
+
+  function closeEditorModal() {
+    if (saving) return;
+    setModalOpen(false);
+    setForm(EMPTY_FORM);
+    setSelectedFile(null);
+    resetUploadState();
+  }
+
+  function handleCancelUpload() {
+    uploadAbortController?.abort();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -149,29 +178,70 @@ export function ItemManager() {
       return;
     }
 
+    const uploadingNewFile = form.type !== "text" && Boolean(selectedFile);
+    const uploadController = uploadingNewFile ? new AbortController() : null;
+
+    if (uploadingNewFile && selectedFile) {
+      setUploadStatus("uploading");
+      setUploadProgress({
+        loadedBytes: 0,
+        totalBytes: selectedFile.size,
+        percent: 0,
+        remainingBytes: selectedFile.size,
+      });
+      setUploadAbortController(uploadController);
+    } else {
+      resetUploadState();
+    }
+
     setSaving(true);
     try {
-      await saveItem({
-        id: form.id || undefined,
-        title: form.title,
-        description: form.description,
-        type: form.type,
-        categoryId: form.categoryId,
-        tagsInput: form.tagsInput,
-        published: form.published,
-        textBody: form.textBody,
-        existingStoragePath: form.existingStoragePath,
-        file: selectedFile,
-      });
+      await saveItem(
+        {
+          id: form.id || undefined,
+          title: form.title,
+          description: form.description,
+          type: form.type,
+          categoryId: form.categoryId,
+          tagsInput: form.tagsInput,
+          published: form.published,
+          textBody: form.textBody,
+          existingStoragePath: form.existingStoragePath,
+          file: selectedFile,
+        },
+        uploadingNewFile
+          ? {
+              signal: uploadController?.signal,
+              onUploadProgress: (progress) => {
+                setUploadProgress(progress);
+                if (progress.percent >= 100) {
+                  setUploadStatus("finalizing");
+                } else {
+                  setUploadStatus("uploading");
+                }
+              },
+            }
+          : undefined,
+      );
 
       await loadItems();
       setForm(EMPTY_FORM);
       setSelectedFile(null);
+      resetUploadState();
       setModalOpen(false);
     } catch (saveError) {
-      setError(getMessage(saveError));
+      if (isAbortError(saveError)) {
+        setUploadStatus("cancelled");
+        setError("Upload cancelado pelo usuário.");
+      } else {
+        if (uploadingNewFile) {
+          setUploadStatus("error");
+        }
+        setError(getMessage(saveError));
+      }
     } finally {
       setSaving(false);
+      setUploadAbortController(null);
     }
   }
 
@@ -186,9 +256,36 @@ export function ItemManager() {
       if (form.id === item.id) {
         setForm(EMPTY_FORM);
         setSelectedFile(null);
+        resetUploadState();
       }
     } catch (deleteError) {
       setError(getMessage(deleteError));
+    }
+  }
+
+  async function handleTogglePublished(item: CatalogItem, nextPublished: boolean) {
+    if (updatingPublishedIds.has(item.id)) {
+      return;
+    }
+
+    setError(null);
+    setUpdatingPublishedIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      return next;
+    });
+
+    try {
+      await updateItemPublished(item.id, nextPublished);
+      await loadItems();
+    } catch (toggleError) {
+      setError(getMessage(toggleError));
+    } finally {
+      setUpdatingPublishedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -200,6 +297,7 @@ export function ItemManager() {
       existingStoragePath: nextType === "text" ? null : prev.existingStoragePath,
     }));
     setSelectedFile(null);
+    resetUploadState();
   }
 
   function handleSort(nextKey: SortKey) {
@@ -341,13 +439,30 @@ export function ItemManager() {
                     <Badge variant="neutral">v1</Badge>
                   </td>
                   <td>
-                    <Badge variant={item.published ? "success" : "warning"}>
-                      {item.published ? "Publicado" : "Rascunho"}
-                    </Badge>
+                    <div className="status-inline-cell">
+                      <input
+                        type="checkbox"
+                        checked={item.published}
+                        onChange={(event) => void handleTogglePublished(item, event.target.checked)}
+                        disabled={loading || updatingPublishedIds.has(item.id)}
+                        aria-label={`Alterar status de publicação de ${item.title}`}
+                        className="status-inline-cell__checkbox"
+                      />
+                      <Badge variant={item.published ? "success" : "warning"}>
+                        {item.published ? "Publicado" : "Rascunho"}
+                      </Badge>
+                    </div>
                   </td>
                   <td>{formatDate(item.updated_at)}</td>
                   <td>
                     <div className="actions">
+                      <button
+                        className="icon-button icon-button--preview"
+                        onClick={() => setPreviewItem(item)}
+                        title="Visualizar"
+                      >
+                        <Eye size={15} />
+                      </button>
                       <button className="icon-button icon-button--edit" onClick={() => startEdit(item)}>
                         <Pencil size={15} />
                       </button>
@@ -397,22 +512,14 @@ export function ItemManager() {
       <Modal
         open={modalOpen}
         title={form.id ? "Editar Conteúdo" : "Novo Conteúdo"}
-        onClose={() => {
-          setModalOpen(false);
-          setForm(EMPTY_FORM);
-          setSelectedFile(null);
-        }}
+        onClose={closeEditorModal}
         width="xl"
         footer={
           <>
             <Button
               variant="outline"
               type="button"
-              onClick={() => {
-                setModalOpen(false);
-                setForm(EMPTY_FORM);
-                setSelectedFile(null);
-              }}
+              onClick={closeEditorModal}
               disabled={saving}
             >
               Cancelar
@@ -486,24 +593,56 @@ export function ItemManager() {
               />
             </label>
           ) : (
-            <label className="ui-field span-2">
+            <div className="ui-field span-2">
               <span className="ui-field__label">Upload ({form.type})</span>
-              <div className="upload-dropzone">
+              <label className="upload-dropzone">
                 <UploadCloud size={18} />
                 <p>Selecione um arquivo para upload</p>
                 <input
                   type="file"
                   accept={getAcceptForType(form.type)}
-                  onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null);
+                    setUploadStatus("idle");
+                    setUploadProgress(null);
+                  }}
                   required={!form.id && !form.existingStoragePath}
+                  disabled={saving}
                 />
                 {form.existingStoragePath ? (
                   <small>
                     Arquivo atual: <code>{form.existingStoragePath}</code>
                   </small>
                 ) : null}
-              </div>
-            </label>
+              </label>
+
+              {uploadProgress ? (
+                <div className="upload-progress-panel" role="status" aria-live="polite">
+                  <div className="upload-progress-track">
+                    <div className="upload-progress-fill" style={{ width: `${uploadProgress.percent}%` }} />
+                  </div>
+                  <p className="upload-progress-label">
+                    {uploadProgress.percent}% • faltam {formatMegabytes(uploadProgress.remainingBytes)} de{" "}
+                    {formatMegabytes(uploadProgress.totalBytes)}
+                  </p>
+                  {uploadStatus === "finalizing" ? (
+                    <p className="upload-progress-note">Finalizando cadastro...</p>
+                  ) : null}
+                  {uploadStatus === "cancelled" ? (
+                    <p className="upload-progress-note upload-progress-note--warning">Upload cancelado.</p>
+                  ) : null}
+                  {uploadStatus === "error" ? (
+                    <p className="upload-progress-note upload-progress-note--error">Falha no upload.</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {saving && uploadStatus === "uploading" && uploadAbortController ? (
+                <Button variant="outline" type="button" onClick={handleCancelUpload}>
+                  Cancelar upload
+                </Button>
+              ) : null}
+            </div>
           )}
 
           <label className="checkbox-row span-2">
@@ -516,6 +655,8 @@ export function ItemManager() {
           </label>
         </form>
       </Modal>
+
+      <ItemPreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
     </section>
   );
 }
@@ -566,4 +707,14 @@ function compareItems(
 
 function getMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected error";
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function formatMegabytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+  const megaBytes = bytes / (1024 * 1024);
+  return megaBytes >= 10 ? `${megaBytes.toFixed(1)} MB` : `${megaBytes.toFixed(2)} MB`;
 }

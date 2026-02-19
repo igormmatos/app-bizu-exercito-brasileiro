@@ -24,6 +24,18 @@ export type ItemInput = {
   file?: File | null;
 };
 
+export type UploadProgressInfo = {
+  loadedBytes: number;
+  totalBytes: number;
+  percent: number;
+  remainingBytes: number;
+};
+
+export type SaveItemOptions = {
+  onUploadProgress?: (progress: UploadProgressInfo) => void;
+  signal?: AbortSignal;
+};
+
 export async function fetchCategories(): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
@@ -95,7 +107,7 @@ export async function fetchItems(filters: {
   return (data ?? []).map((row) => parseCatalogItem(row));
 }
 
-export async function saveItem(input: ItemInput): Promise<CatalogItem> {
+export async function saveItem(input: ItemInput, options?: SaveItemOptions): Promise<CatalogItem> {
   const itemId = input.id ?? crypto.randomUUID();
   const title = input.title.trim();
   const categoryId = input.categoryId.trim();
@@ -128,16 +140,10 @@ export async function saveItem(input: ItemInput): Promise<CatalogItem> {
       const reusePath =
         storagePath && storagePath.startsWith(expectedPrefix) ? storagePath : `${expectedPrefix}.${extension}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("content")
-        .upload(reusePath, input.file, {
-          upsert: true,
-          contentType: input.file.type || undefined,
-        });
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
+      await uploadFileWithProgress(reusePath, input.file, {
+        onProgress: options?.onUploadProgress,
+        signal: options?.signal,
+      });
 
       storagePath = reusePath;
     }
@@ -183,6 +189,21 @@ export async function deleteItem(itemId: string): Promise<void> {
   }
 }
 
+export async function updateItemPublished(itemId: string, published: boolean): Promise<CatalogItem> {
+  const { data, error } = await supabase
+    .from("items")
+    .update({ published })
+    .eq("id", itemId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update item status: ${error.message}`);
+  }
+
+  return parseCatalogItem(data);
+}
+
 export function getPublicFileUrl(path: string): string {
   const { data } = supabase.storage.from("content").getPublicUrl(path);
   return data.publicUrl;
@@ -220,4 +241,134 @@ function resolveFileExtension(file: File): string {
   };
 
   return byMime[file.type] ?? "bin";
+}
+
+async function uploadFileWithProgress(
+  path: string,
+  file: File,
+  options: {
+    onProgress?: (progress: UploadProgressInfo) => void;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  const { data: signedData, error: signedUrlError } = await supabase.storage
+    .from("content")
+    .createSignedUploadUrl(path, { upsert: true });
+
+  if (signedUrlError) {
+    throw new Error(`Upload failed: ${signedUrlError.message}`);
+  }
+
+  if (!signedData?.signedUrl) {
+    throw new Error("Upload failed: signed upload URL not generated.");
+  }
+
+  await uploadWithXhr(signedData.signedUrl, file, options);
+}
+
+function uploadWithXhr(
+  signedUrl: string,
+  file: File,
+  options: {
+    onProgress?: (progress: UploadProgressInfo) => void;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+
+    const abortListener = () => {
+      xhr.abort();
+    };
+
+    const cleanup = () => {
+      xhr.upload.onprogress = null;
+      xhr.onload = null;
+      xhr.onerror = null;
+      xhr.onabort = null;
+      options.signal?.removeEventListener("abort", abortListener);
+    };
+
+    const totalSize = file.size || 0;
+
+    options.onProgress?.({
+      loadedBytes: 0,
+      totalBytes: totalSize,
+      percent: 0,
+      remainingBytes: totalSize,
+    });
+
+    xhr.open("PUT", signedUrl);
+    xhr.setRequestHeader("cache-control", "max-age=3600");
+    if (file.type) {
+      xhr.setRequestHeader("content-type", file.type);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      const totalBytes = event.lengthComputable && event.total > 0 ? event.total : totalSize;
+      const loadedBytes = Math.min(event.loaded, totalBytes);
+      const percent = totalBytes > 0 ? Math.round((loadedBytes / totalBytes) * 100) : 0;
+
+      options.onProgress?.({
+        loadedBytes,
+        totalBytes,
+        percent,
+        remainingBytes: Math.max(totalBytes - loadedBytes, 0),
+      });
+    };
+
+    xhr.onload = () => {
+      cleanup();
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        options.onProgress?.({
+          loadedBytes: totalSize,
+          totalBytes: totalSize,
+          percent: 100,
+          remainingBytes: 0,
+        });
+        resolve();
+        return;
+      }
+
+      reject(new Error(`Upload failed: ${parseStorageUploadError(xhr.responseText)}`));
+    };
+
+    xhr.onerror = () => {
+      cleanup();
+      reject(new Error("Upload failed: network error during file transfer."));
+    };
+
+    xhr.onabort = () => {
+      cleanup();
+      reject(createAbortError());
+    };
+
+    options.signal?.addEventListener("abort", abortListener, { once: true });
+    xhr.send(file);
+  });
+}
+
+function parseStorageUploadError(responseText: string): string {
+  if (!responseText) {
+    return "unexpected storage response.";
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as { error?: string; message?: string };
+    return parsed.message ?? parsed.error ?? "unexpected storage response.";
+  } catch {
+    return responseText;
+  }
+}
+
+function createAbortError(): Error {
+  const error = new Error("Upload aborted by user.");
+  error.name = "AbortError";
+  return error;
 }
