@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Screen } from "@/src/components/layout";
 import { Card, PrimaryButton } from "@/src/components/ui";
@@ -13,15 +14,50 @@ const CATEGORY_OPTIONS = ["Conteúdo", "Bug", "UX", "Outro"] as const;
 type SubmitState = "idle" | "loading" | "sent" | "error";
 
 export default function SuggestionScreen() {
+  const params = useLocalSearchParams<{
+    prefillMessage?: string | string[];
+    prefillCategory?: string | string[];
+  }>();
   const [category, setCategory] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [prefillApplied, setPrefillApplied] = useState(false);
+
+  const prefillMessage = pickParamValue(params.prefillMessage).trim();
+  const prefillCategory = pickParamValue(params.prefillCategory).trim();
 
   const messageLength = message.length;
   const isMessageValid = message.trim().length > 0 && messageLength <= MESSAGE_MAX;
   const isSubmitting = submitState === "loading";
+
+  useEffect(() => {
+    if (prefillApplied) {
+      return;
+    }
+
+    let hasApplied = false;
+
+    if (prefillMessage && message.trim().length === 0) {
+      setMessage(prefillMessage);
+      hasApplied = true;
+    }
+
+    if (prefillCategory && !category) {
+      const matchedCategory = CATEGORY_OPTIONS.find(
+        (option) => option.toLowerCase() === prefillCategory.toLowerCase(),
+      );
+      if (matchedCategory) {
+        setCategory(matchedCategory);
+        hasApplied = true;
+      }
+    }
+
+    if (hasApplied || (!prefillMessage && !prefillCategory)) {
+      setPrefillApplied(true);
+    }
+  }, [prefillApplied, prefillMessage, prefillCategory, message, category]);
 
   function resetFeedback() {
     if (submitState !== "idle") {
@@ -287,3 +323,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+function pickParamValue(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
+}

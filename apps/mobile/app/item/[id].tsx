@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
-import { Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, Image } from "react-native";
+import { Alert, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, Image } from "react-native";
+import { WebView } from "react-native-webview";
 import { Screen } from "@/src/components/layout";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
@@ -26,12 +27,20 @@ export default function ItemDetailScreen() {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
+  const [lyricsExpanded, setLyricsExpanded] = useState(false);
+  const [lyricsNeedsToggle, setLyricsNeedsToggle] = useState(false);
+  const [lyricsNoticeShown, setLyricsNoticeShown] = useState(false);
+  const [videoEmbedFailed, setVideoEmbedFailed] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
 
   const downloadedEntry = item ? downloadedMap[item.id] : undefined;
   const isDownloaded = Boolean(downloadedEntry);
   const mediaType = item ? resolveMediaType(item.type, item.storage_path) : null;
   const isMediaItem = Boolean(mediaType && item?.storage_path);
   const remoteUrl = item?.storage_path ? getPublicContentUrl(item.storage_path) : null;
+  const videoLink = item?.type === "video" ? (item.link?.trim() ?? "") : "";
+  const youtubeEmbedUrl = useMemo(() => getYouTubeEmbedUrl(videoLink), [videoLink]);
+  const canRenderEmbeddedVideo = Platform.OS !== "web";
   const imageSourceUri = mediaType === "image" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
   const audioSource = mediaType === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
   const audioPlayer = useAudioPlayer(audioSource ?? null);
@@ -43,12 +52,14 @@ export default function ItemDetailScreen() {
   const audioProgress = audioDuration > 0 ? Math.max(0, Math.min(1, displayedAudioTime / audioDuration)) : 0;
   const textContent = item?.text_body?.trim() ?? "";
   const textBlocks = useMemo(() => parseSafeHtml(textContent), [textContent]);
+  const shouldShowLyrics = item?.type === "audio" || item?.type === "video";
   const lyricsText = useMemo(() => {
-    if (!item || mediaType !== "audio") {
+    if (!item || !shouldShowLyrics) {
       return "";
     }
-    return item.text_body?.trim() || item.description?.trim() || "Sem letra cadastrada para este áudio.";
-  }, [item, mediaType]);
+    return item.text_body?.trim() || item.description?.trim() || "Sem letra cadastrada para este conteúdo.";
+  }, [item, shouldShowLyrics]);
+  const isLyricsLongByLength = lyricsText.length >= LYRICS_TOGGLE_CHAR_THRESHOLD;
 
   useEffect(() => {
     let active = true;
@@ -90,7 +101,15 @@ export default function ItemDetailScreen() {
     setIsScrubbing(false);
     setScrubTime(null);
     setProgressTrackWidth(0);
+    setLyricsExpanded(false);
+    setLyricsNeedsToggle(false);
+    setLyricsNoticeShown(false);
+    setVideoEmbedFailed(false);
   }, [item?.id]);
+
+  useEffect(() => {
+    setLyricsNeedsToggle(isLyricsLongByLength);
+  }, [isLyricsLongByLength]);
 
   useEffect(() => {
     if (mediaType !== "audio") {
@@ -201,6 +220,17 @@ export default function ItemDetailScreen() {
     }
   }
 
+  async function handleOpenYoutube() {
+    if (!videoLink) {
+      return;
+    }
+    try {
+      await Linking.openURL(videoLink);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao abrir link do YouTube."));
+    }
+  }
+
   async function handleAudioPlayPause() {
     if (!item || mediaType !== "audio" || !remoteUrl) return;
 
@@ -270,6 +300,73 @@ export default function ItemDetailScreen() {
       setMessage(toMessage(error, "Falha ao reiniciar áudio."));
     } finally {
       setAudioBusy(false);
+    }
+  }
+
+  function handleToggleLyrics() {
+    if (lyricsExpanded) {
+      setLyricsExpanded(false);
+      return;
+    }
+
+    if (!lyricsNoticeShown) {
+      if (Platform.OS === "web") {
+        setLyricsNoticeShown(true);
+        setMessage("Aviso: a letra pode conter conteúdo sensível.");
+        setLyricsExpanded(true);
+        return;
+      }
+
+      Alert.alert("Aviso", "A letra pode conter conteúdo sensível.", [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Continuar",
+          onPress: () => {
+            setLyricsNoticeShown(true);
+            setLyricsExpanded(true);
+          },
+        },
+      ]);
+      return;
+    }
+
+    setLyricsExpanded(true);
+  }
+
+  async function handleReportContent() {
+    if (!item || (item.type !== "audio" && item.type !== "video")) {
+      return;
+    }
+
+    const prefillMessage = `Reportar conteúdo: ${item.title} (${item.id}) - motivo: `;
+    const mailSubject = encodeURIComponent(`Reportar conteúdo: ${item.title}`);
+    const mailBody = encodeURIComponent(prefillMessage);
+
+    setReportBusy(true);
+    setMessage(null);
+
+    try {
+      try {
+        router.push({
+          pathname: "/(tabs)/suggestion",
+          params: {
+            prefillMessage,
+            prefillCategory: "Conteúdo",
+          },
+        });
+        return;
+      } catch {
+        // fallback to mailto below
+      }
+
+      await Linking.openURL(`mailto:?subject=${mailSubject}&body=${mailBody}`);
+    } catch (error) {
+      setMessage(toMessage(error, "Falha ao abrir fluxo de reporte."));
+    } finally {
+      setReportBusy(false);
     }
   }
 
@@ -367,6 +464,37 @@ export default function ItemDetailScreen() {
             </View>
 
             {item.type === "pdf" || item.type === "image" ? <PreviewPlaceholder type={item.type} height={170} /> : null}
+
+            {item.type === "video" ? (
+              <Card style={styles.videoCard}>
+                {youtubeEmbedUrl && !videoEmbedFailed && canRenderEmbeddedVideo ? (
+                  <View style={styles.videoEmbedFrame}>
+                    <WebView
+                      source={{ uri: youtubeEmbedUrl }}
+                      style={styles.videoEmbed}
+                      allowsFullscreenVideo
+                      javaScriptEnabled
+                      domStorageEnabled
+                      onError={() => setVideoEmbedFailed(true)}
+                      onHttpError={() => setVideoEmbedFailed(true)}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.videoFallback}>
+                    <Text style={styles.metaText}>
+                      {canRenderEmbeddedVideo
+                        ? "Não foi possível carregar o vídeo incorporado."
+                        : "Visualização incorporada não é suportada no web. Abra no YouTube."}
+                    </Text>
+                  </View>
+                )}
+                <OutlineButton
+                  label="Abrir no YouTube"
+                  onPress={() => void handleOpenYoutube()}
+                  disabled={!videoLink || reportBusy}
+                />
+              </Card>
+            ) : null}
 
             <Text style={styles.title}>{item.title}</Text>
 
@@ -478,13 +606,42 @@ export default function ItemDetailScreen() {
                   <Text style={styles.timeText}>{formatSeconds(audioDuration)}</Text>
                 </View>
 
-                <View style={styles.lyricsBox}>
-                  <Text style={styles.lyricsLabel}>LETRA DA CANÇÃO</Text>
-                  <ScrollView nestedScrollEnabled style={styles.lyricsScroll}>
-                    <Text style={styles.lyricsText}>{lyricsText}</Text>
-                  </ScrollView>
-                </View>
               </Card>
+            ) : null}
+
+            {shouldShowLyrics ? (
+              <Card style={styles.lyricsCard}>
+                <Text style={styles.lyricsLabel}>LETRA</Text>
+                <Text
+                  style={styles.lyricsText}
+                  numberOfLines={lyricsExpanded ? undefined : LYRICS_COLLAPSED_LINES}
+                  onTextLayout={(event) => {
+                    if (!lyricsExpanded && event.nativeEvent.lines.length > LYRICS_COLLAPSED_LINES) {
+                      setLyricsNeedsToggle(true);
+                    }
+                  }}
+                >
+                  {lyricsText}
+                </Text>
+                {lyricsNeedsToggle ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.lyricsToggleButton, pressed ? styles.transportButtonPressed : null]}
+                    onPress={handleToggleLyrics}
+                  >
+                    <Text style={styles.lyricsToggleText}>
+                      {lyricsExpanded ? "Ver menos" : "Ver letra completa"}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </Card>
+            ) : null}
+
+            {item.type === "audio" || item.type === "video" ? (
+              <OutlineButton
+                label={reportBusy ? "Abrindo..." : "Reportar conteúdo"}
+                onPress={() => void handleReportContent()}
+                disabled={reportBusy}
+              />
             ) : null}
 
             {item.type === "text" && mediaType === "image" ? (
@@ -581,6 +738,33 @@ const styles = StyleSheet.create({
   },
   audioCard: {
     gap: 10,
+  },
+  videoCard: {
+    padding: 0,
+    overflow: "hidden",
+    gap: 10,
+  },
+  videoEmbedFrame: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.gray900,
+  },
+  videoEmbed: {
+    flex: 1,
+    backgroundColor: colors.gray900,
+  },
+  videoFallback: {
+    minHeight: 140,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    margin: 10,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
   },
   audioTransportBar: {
     flexDirection: "row",
@@ -683,32 +867,37 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     fontWeight: "600",
   },
-  lyricsBox: {
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    padding: 10,
+  lyricsCard: {
     gap: 8,
-    minHeight: 180,
   },
   lyricsLabel: {
     fontSize: 11,
     color: colors.gray500,
     fontWeight: "700",
-    textAlign: "center",
+    textAlign: "left",
     letterSpacing: 0.4,
-  },
-  lyricsScroll: {
-    maxHeight: 165,
   },
   lyricsText: {
     color: colors.gray700,
-    textAlign: "center",
+    textAlign: "left",
     fontStyle: "italic",
     fontFamily: "serif",
-    fontSize: 17,
-    lineHeight: 28,
+    fontSize: 16,
+    lineHeight: 26,
+  },
+  lyricsToggleButton: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  lyricsToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.gray700,
   },
   textBody: {
     color: colors.gray700,
@@ -790,6 +979,9 @@ function formatSeconds(value: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+const LYRICS_COLLAPSED_LINES = 10;
+const LYRICS_TOGGLE_CHAR_THRESHOLD = 600;
+
 function toMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
     return `${fallback} ${error.message}`;
@@ -798,7 +990,7 @@ function toMessage(error: unknown, fallback: string): string {
 }
 
 function resolveMediaType(
-  itemType: "pdf" | "audio" | "image" | "text",
+  itemType: "pdf" | "audio" | "image" | "text" | "video",
   storagePath?: string | null,
 ): DownloadableMediaType | null {
   if (!storagePath) {
@@ -814,6 +1006,52 @@ function resolveMediaType(
   }
 
   return null;
+}
+
+function getYouTubeId(link: string): string | null {
+  const trimmedLink = link.trim();
+  if (!trimmedLink) {
+    return null;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmedLink);
+  } catch {
+    return null;
+  }
+
+  const host = parsedUrl.hostname.toLowerCase();
+  const normalizedHost = host.replace(/^www\./, "");
+
+  if (normalizedHost === "youtu.be") {
+    return parsedUrl.pathname.split("/").filter(Boolean)[0] ?? null;
+  }
+
+  if (normalizedHost === "youtube.com" || normalizedHost.endsWith(".youtube.com")) {
+    if (parsedUrl.pathname === "/watch") {
+      return parsedUrl.searchParams.get("v")?.trim() || null;
+    }
+
+    if (parsedUrl.pathname.startsWith("/shorts/")) {
+      return parsedUrl.pathname.split("/").filter(Boolean)[1] ?? null;
+    }
+
+    if (parsedUrl.pathname.startsWith("/embed/")) {
+      return parsedUrl.pathname.split("/").filter(Boolean)[1] ?? null;
+    }
+  }
+
+  return null;
+}
+
+function getYouTubeEmbedUrl(link: string): string | null {
+  const videoId = getYouTubeId(link);
+  if (!videoId) {
+    return null;
+  }
+
+  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
 }
 
 function renderHtmlBlocks(blocks: ReturnType<typeof parseSafeHtml>) {
