@@ -496,7 +496,7 @@ export function ItemManager() {
             </label>
           </div>
 
-          <table className="table">
+          <table className="table table--items">
             <thead>
               <tr>
                 <th>
@@ -533,8 +533,12 @@ export function ItemManager() {
                 <tr key={item.id}>
                   <td>
                     <div className="table-title-cell">
-                      <strong>{item.title}</strong>
-                      <small className="text-muted">{item.description ?? "-"}</small>
+                      <strong className="table-title-cell__title" title={item.title}>
+                        {item.title}
+                      </strong>
+                      <small className="text-muted table-title-cell__description" title={item.description ?? "-"}>
+                        {item.description ?? "-"}
+                      </small>
                     </div>
                   </td>
                   <td>
