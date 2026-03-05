@@ -34,7 +34,6 @@ function AppStack() {
       <Stack.Screen name="item/[id]" options={{ title: "Detalhes" }} />
       <Stack.Screen name="search" options={{ title: "Busca" }} />
       <Stack.Screen name="admin" options={{ title: "Admin/Diagnóstico" }} />
-      <Stack.Screen name="pdf" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" options={{ title: "Not Found" }} />
     </Stack>
   );

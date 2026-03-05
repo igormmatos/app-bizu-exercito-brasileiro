@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, TextInput, View, type TextInputProps, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, TextInput, View, type TextInputProps, type ViewStyle } from "react-native";
 import { colors } from "@/src/theme/tokens";
 
 type SearchBarProps = Omit<TextInputProps, "style"> & {
@@ -9,7 +9,7 @@ type SearchBarProps = Omit<TextInputProps, "style"> & {
 
 export function SearchBar({ containerStyle, inputStyle, placeholder, ...props }: SearchBarProps) {
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, Platform.OS === "web" ? styles.containerWeb : null, containerStyle]}>
       <Ionicons name="search" size={16} color={colors.gray500} />
       <TextInput
         {...props}
@@ -32,6 +32,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  containerWeb: {
+    minHeight: 40,
   },
   input: {
     flex: 1,

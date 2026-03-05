@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/src/components/layout";
+import { Screen, WebContent } from "@/src/components/layout";
 import { Card, ContentListItem, OutlineButton, PillBadge, PrimaryButton, SearchBar } from "@/src/components/ui";
 import {
   createBatchController,
@@ -147,7 +147,8 @@ export default function CategoryItemsScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <WebContent style={styles.container}>
         <SearchBar
           value={query}
           onChangeText={setQuery}
@@ -251,6 +252,7 @@ export default function CategoryItemsScreen() {
               />
             ))
           : null}
+        </WebContent>
       </ScrollView>
     </Screen>
   );
@@ -260,8 +262,10 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 16,
+  },
   container: {
-    padding: 16,
     gap: 12,
     backgroundColor: colors.gray100,
   },

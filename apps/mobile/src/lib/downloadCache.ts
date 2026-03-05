@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system/legacy";
+import { hasDownloadResponse } from "./downloadStorage";
 
 export type DownloadedEntry = {
   localUri: string;
@@ -43,8 +43,8 @@ export async function getDownloadedMap(): Promise<DownloadedMap> {
       continue;
     }
 
-    const fileInfo = await FileSystem.getInfoAsync(entry.localUri);
-    if (!fileInfo.exists) {
+    const existsInCache = await hasDownloadResponse(entry.localUri);
+    if (!existsInCache) {
       continue;
     }
 

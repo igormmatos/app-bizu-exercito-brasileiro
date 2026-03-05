@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/src/components/layout";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
 import { Card, ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { normalize, searchCatalogIndex } from "@/src/lib/searchIndex";
 import { useCatalog } from "@/src/state/catalogContext";
@@ -36,7 +36,8 @@ export default function SearchScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <WebContent style={styles.container}>
         <SearchBar
           value={query}
           onChangeText={setQuery}
@@ -100,15 +101,20 @@ export default function SearchScreen() {
               />
             ))
           : null}
-      </View>
+        </WebContent>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    padding: 16,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  container: {
     gap: 12,
     backgroundColor: colors.gray100,
   },

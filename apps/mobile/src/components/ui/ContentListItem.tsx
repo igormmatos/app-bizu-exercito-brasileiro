@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { getContentColors, type ContentType, colors } from "@/src/theme/tokens";
 
 type ContentListItemProps = {
@@ -25,7 +25,7 @@ export function ContentListItem({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null, style]}
+      style={({ pressed }) => [styles.card, Platform.OS === "web" ? styles.cardWeb : null, pressed ? styles.pressed : null, style]}
     >
       <View style={[styles.iconCircle, { backgroundColor: palette.bg }]}>
         <Ionicons name={iconByType(type)} size={16} color={palette.primary} />
@@ -64,6 +64,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
+  },
+  cardWeb: {
+    minHeight: 64,
+    paddingVertical: 9,
   },
   pressed: {
     opacity: 0.9,

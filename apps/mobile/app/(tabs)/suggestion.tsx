@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useEffect, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { Screen } from "@/src/components/layout";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
 import { Card, PrimaryButton } from "@/src/components/ui";
 import { submitSuggestion } from "@/src/lib/suggestionsApi";
 import { colors } from "@/src/theme/tokens";
@@ -122,7 +122,12 @@ export default function SuggestionScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <WebContent style={styles.container}>
         <Card style={styles.formCard}>
           <View style={styles.iconCircle}>
             <Ionicons name="chatbox-outline" size={18} color={colors.army600} />
@@ -205,15 +210,20 @@ export default function SuggestionScreen() {
             </View>
           </Card>
         ) : null}
-      </View>
+        </WebContent>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    padding: 16,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  container: {
     gap: 12,
     backgroundColor: colors.gray100,
   },

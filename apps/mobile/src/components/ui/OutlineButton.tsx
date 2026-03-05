@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
 import { colors } from "@/src/theme/tokens";
 
 type OutlineButtonProps = {
@@ -22,15 +22,15 @@ export function OutlineButton({
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
+        Platform.OS === "web" ? styles.buttonWeb : null,
         compact ? styles.compact : null,
+        compact && Platform.OS === "web" ? styles.compactWeb : null,
         pressed && !disabled ? styles.pressed : null,
         disabled ? styles.disabled : null,
         style,
       ]}
     >
-      <View>
-        <Text style={styles.text}>{label}</Text>
-      </View>
+      <Text style={styles.text}>{label}</Text>
     </Pressable>
   );
 }
@@ -47,9 +47,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
+  buttonWeb: {
+    minHeight: 40,
+    paddingVertical: 9,
+  },
   compact: {
     minHeight: 36,
     paddingVertical: 8,
+  },
+  compactWeb: {
+    minHeight: 34,
+    paddingVertical: 7,
   },
   pressed: {
     backgroundColor: colors.gray100,

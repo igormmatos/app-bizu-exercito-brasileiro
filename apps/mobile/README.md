@@ -1,11 +1,11 @@
-# Mobile App (Expo)
+# Mobile App (`apps/mobile`) - Web/PWA
 
-Aplicativo mobile do Bizu EB em `apps/mobile`, com Expo Router e TypeScript.
+Aplicacao do Bizu EB em Expo Router + TypeScript, operando em modo **web-first/PWA-only**.
 
 ## Pre-requisitos
 - Node.js 20+
 - npm 10+
-- Expo Go instalado no celular (Android/iOS)
+- Navegador moderno (Chrome recomendado para validacao PWA)
 
 ## Variaveis de ambiente (Supabase publico)
 Crie `apps/mobile/.env` (ou `.env.local`) com:
@@ -15,81 +15,114 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-Tambem existe um modelo em `apps/mobile/.env.example`.
+Tambem existe `apps/mobile/.env.example`.
 
-## Como rodar localmente
+## Arquitetura PWA (web-only)
+
+Substituicoes aplicadas para compatibilidade total web:
+
+- `expo-file-system` -> `fetch` + `Cache API` (downloads offline)
+- `expo-audio` -> HTML5 Audio (controle de play/pause/seek/repeat)
+- PDF viewer customizado -> abertura nativa do navegador (`window.open`)
+- `Linking.openURL` -> `window.open` / `window.location`
+- `react-native-youtube-iframe` -> embed web via `iframe` (`YoutubeEmbed.web.tsx`)
+
+Dependencias mobile-only removidas do workspace `apps/mobile`:
+
+- `expo-audio`
+- `expo-file-system`
+- `expo-linking`
+- `expo-web-browser`
+- `react-native-webview`
+- `react-native-youtube-iframe`
+
+## Como rodar localmente (dev web)
+
 Na raiz do monorepo:
 
-1. Instalar dependencias:
-   - `npm install`
-2. Iniciar o Metro bundler:
-   - `npm run start -w apps/mobile`
-3. Abrir no dispositivo:
-   - Escanear o QR Code com o Expo Go
+1. `npm install`
+2. `npm -w apps/mobile run start -- --web --port 8082`
 
-## Comandos principais
-- `npm run start -w apps/mobile`
-- `npm run android -w apps/mobile`
-- `npm run ios -w apps/mobile`
-- `npm run web -w apps/mobile`
+Observacao: em dev o service worker nao e registrado (comportamento intencional para nao poluir cache durante desenvolvimento).
 
-## Navegacao base
-- Tabs principais: `Home`, `Favoritos`, `Sugestao`.
-- Busca global fica no Header (nao e tab) e abre a rota `/search`.
-- `Admin/Diagnostico` fica fora da tab bar em `/admin`.
-- Atalho tecnico: long-press no titulo `Bizus EB` no Header para abrir `/admin`.
+## Build de producao (web export)
 
-## Favoritos (offline-first)
-- Favoritos sao locais (AsyncStorage) com chave `favorites.itemIds`.
-- E possivel favoritar/desfavoritar no detalhe do item e nas listas (Home/Category/Search).
-- A tab `Favoritos` resolve os ids no catalogo em memoria e exibe apenas itens existentes.
-- Empty state: `Voce ainda nao favoritou nenhum item.`
+No workspace `apps/mobile`:
 
-## Bizu do Dia
-- A Home mostra um card de destaque `Bizu do Dia` com 1 item do catalogo local.
-- A escolha e deterministica por dia e persistida em AsyncStorage:
-  - `bizu.todayKey`
-  - `bizu.itemId`
-- O item se mantem estavel durante o mesmo dia, mesmo com reabertura do app.
-- Na rota tecnica `/admin`, existe o botao `Recalcular Bizu do Dia`.
+1. `npx expo export --platform web`
 
-## Downloads offline (media)
-- Itens `pdf`, `audio` e `image` podem ser baixados na tela de detalhe do item.
-- Os arquivos ficam em `FileSystem.documentDirectory + "downloads/"`, organizados por tipo:
-  - `downloads/pdf/`
-  - `downloads/audio/`
-  - `downloads/image/`
-- O status de download e persistido em AsyncStorage (`downloads.map`).
-- O playback de audio usa `expo-audio` (play/pause com fonte local quando baixado, remoto quando nao baixado).
+Saida gerada em:
 
-## Remocao de downloads
-- Na aba `Admin/Diagnostico`, use `Limpar downloads` para:
-  - apagar arquivos locais da pasta `downloads/`
-  - limpar o mapa de downloads no AsyncStorage
+- `apps/mobile/dist`
 
-## Download por categoria
-- Na tela de categoria, existe `Baixar categoria` para processar todos os itens elegiveis (`pdf`, `audio`, `image` com `storage_path`).
-- O lote roda em modo sequencial (1 por vez), exibindo progresso (`X/Y`) e item atual.
-- Em caso de falha de item, o lote continua e mostra resumo no final.
-- Tambem existe `Remover downloads da categoria` para apagar os arquivos locais da categoria.
+## Downloads offline (midia)
 
-## PDF viewer embutido (WebView + pdf.js)
-- A rota `app/pdf.tsx` abre PDFs dentro do app usando `react-native-webview`.
-- Viewer local em `assets/pdfjs/` com `pdf.js` (assets versionados e copiados para `pdf.min.js`/`pdf.worker.min.js` em runtime).
-- O detalhe do item (`item/[id]`) envia para `/pdf?uri=...`:
-  - remoto: URL publica do Storage
-  - local: `file://...` com fallback por base64 via `postMessage` para garantir renderizacao no viewer
+- Itens `pdf`, `audio` e `image` continuam baixaveis no detalhe do item.
+- Os arquivos sao persistidos no `Cache API` (`bizu-downloads-v1`).
+- O mapa de downloads continua em AsyncStorage (`downloads.map`).
+- O `localUri` agora e virtual (`/__bizu-downloads__/...`) e resolvido no browser.
 
-## Busca local melhorada
-- Busca acento-insensivel e case-insensitive (`normalize` com Unicode NFD + remocao de diacriticos).
-- Indice leve em memoria no `CatalogContext`, recalculado quando o catalogo muda.
-- Ranking por relevancia:
-  - titulo: `startsWith +100`, `contains +60`
-  - tags: `+40`
-  - descricao: `+20`
-  - text_body (itens text): `+10`
-- Ordenacao por score desc e, em empate, titulo asc.
-- Limite de retorno em top 50 para manter fluidez.
+## PDF via navegador nativo
 
-## Limitacao atual de PDF
-- O viewer e propositalmente minimo (navegacao de pagina + zoom basico).
+- Itens de PDF exibem somente a acao `Abrir PDF`.
+- A abertura usa nova aba do navegador (`window.open(url, "_blank")`).
+- O proprio navegador controla renderizacao, zoom, busca, navegacao e download.
+- Para PDF baixado offline, o app resolve a URL cacheada antes de abrir.
+
+## PWA
+
+### Manifest + instalacao
+
+- `public/manifest.webmanifest`
+- `app/+html.tsx` com meta tags Android/iOS:
+  - `theme-color`
+  - `application-name`
+  - `apple-mobile-web-app-*`
+  - `apple-touch-icon`
+
+### Service Worker
+
+- Arquivo: `public/service-worker.js`
+- Registro somente em producao (`NODE_ENV=production`)
+- Estrategia:
+  - precache de app shell e assets principais
+  - `network-first` para navegacao com fallback para `offline.html`
+  - `cache-first` para assets estaticos
+  - suporte explicito ao prefixo `"/__bizu-downloads__/"`
+
+### Offline fallback
+
+- Arquivo: `public/offline.html`
+- Mensagem padrao:
+  - `Sem internet. Abra um conteudo ja acessado ou volte quando a conexao retornar.`
+
+## Teste local da PWA (producao)
+
+1. `npx expo export --platform web`
+2. Servir `apps/mobile/dist` com servidor estatico (exemplo):
+   - `npx serve apps/mobile/dist`
+3. Abrir no Chrome e validar em `Application`:
+   - Manifest
+   - Service Workers
+   - Cache Storage
+4. Rodar Lighthouse com foco PWA.
+
+## Deploy (Vercel / Netlify)
+
+Publicar a pasta:
+
+- `apps/mobile/dist`
+
+Garantir que estes arquivos fiquem acessiveis na raiz publicada:
+
+- `manifest.webmanifest`
+- `service-worker.js`
+- `offline.html`
+- `icons/*`
+
+## Limitacoes conhecidas
+
+- iOS Safari possui limitacoes de instalacao/cache comparado ao Chrome Android.
+- Conteudos nao acessados/baixados previamente podem cair no fallback offline.
+- O comportamento offline de links externos depende de disponibilidade da origem.
+- Bloqueadores de pop-up podem impedir abertura de PDF se o clique nao vier de gesto direto do usuario.

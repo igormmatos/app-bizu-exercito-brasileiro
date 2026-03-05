@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/src/components/layout";
+import { Screen, WebContent } from "@/src/components/layout";
 import { ContentListItem, PillBadge, SearchBar } from "@/src/components/ui";
 import { loadRecentItemIds } from "@/src/lib/recentCache";
 import { useCatalog } from "@/src/state/catalogContext";
@@ -86,7 +86,8 @@ export default function HomeScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <WebContent style={styles.container}>
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -111,7 +112,11 @@ export default function HomeScreen() {
                 return (
                   <Pressable
                     key={category.id}
-                    style={styles.gridItem}
+                    style={({ pressed }) => [
+                      styles.gridItem,
+                      styles.categoryCard,
+                      pressed ? styles.categoryCardPressed : null,
+                    ]}
                     onPress={() =>
                       router.push({
                         pathname: "/category/[id]",
@@ -119,24 +124,20 @@ export default function HomeScreen() {
                       })
                     }
                   >
-                    {({ pressed }) => (
-                      <View style={[styles.categoryCard, pressed ? styles.categoryCardPressed : null]}>
-                        <View style={styles.categoryIconCircle}>
-                          <Ionicons name="book-outline" size={18} color={colors.army600} />
-                        </View>
-                        <Text style={styles.categoryTitle} numberOfLines={2}>
-                          {category.name}
-                        </Text>
-                        <Text style={styles.categoryCount}>{stat.total} itens</Text>
-                        {stat.offline > 0 ? (
-                          <PillBadge
-                            label={`${stat.offline} offline`}
-                            tone="success"
-                            style={styles.categoryOfflineBadge}
-                          />
-                        ) : null}
-                      </View>
-                    )}
+                    <View style={styles.categoryIconCircle}>
+                      <Ionicons name="book-outline" size={18} color={colors.army600} />
+                    </View>
+                    <Text style={styles.categoryTitle} numberOfLines={2}>
+                      {category.name}
+                    </Text>
+                    <Text style={styles.categoryCount}>{stat.total} itens</Text>
+                    {stat.offline > 0 ? (
+                      <PillBadge
+                        label={`${stat.offline} offline`}
+                        tone="success"
+                        style={styles.categoryOfflineBadge}
+                      />
+                    ) : null}
                   </Pressable>
                 );
               })
@@ -192,6 +193,7 @@ export default function HomeScreen() {
               />
             ))
           : null}
+        </WebContent>
       </ScrollView>
     </Screen>
   );
@@ -201,8 +203,10 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 16,
+  },
   container: {
-    padding: 16,
     gap: 12,
     backgroundColor: colors.gray100,
   },

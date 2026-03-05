@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/src/components/layout";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
 import { Card, ContentListItem } from "@/src/components/ui";
 import { useCatalog } from "@/src/state/catalogContext";
 import { type ContentType, colors } from "@/src/theme/tokens";
@@ -29,7 +29,8 @@ export default function FavoritesScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <WebContent style={styles.container}>
         {loadingCache || loadingFavorites ? <Text style={styles.metaText}>Carregando favoritos...</Text> : null}
 
         {!loadingCache && !loadingFavorites && favoriteItems.length === 0 ? (
@@ -64,15 +65,20 @@ export default function FavoritesScreen() {
               />
             ))
           : null}
-      </View>
+        </WebContent>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    padding: 16,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  container: {
     gap: 12,
     backgroundColor: colors.gray100,
   },

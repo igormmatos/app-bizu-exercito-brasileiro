@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
 
@@ -57,7 +58,9 @@ export default function AdminDiagnosticScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen edges={["left", "right"]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <WebContent style={styles.container}>
       <Text style={styles.title}>Admin/Diagnóstico</Text>
       <Text style={styles.line}>Rota técnica (fora da barra de abas).</Text>
 
@@ -91,14 +94,20 @@ export default function AdminDiagnosticScreen() {
       </View>
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
-    </View>
+        </WebContent>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
-    padding: 16,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  container: {
     gap: 8,
     backgroundColor: colors.gray100,
   },

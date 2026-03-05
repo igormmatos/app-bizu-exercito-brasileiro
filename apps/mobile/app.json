@@ -27,11 +27,19 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Bizus EB",
+      "shortName": "Bizu EB",
+      "lang": "pt-BR",
+      "themeColor": "#26392D",
+      "backgroundColor": "#F3F4F6",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "scope": "/"
     },
     "plugins": [
-      "expo-router",
-      "expo-audio"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true

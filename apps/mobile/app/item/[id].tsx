@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import * as FileSystem from "expo-file-system/legacy";
-import { Alert, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, Image } from "react-native";
-import YoutubePlayer from "react-native-youtube-iframe";
-import { Screen } from "@/src/components/layout";
+import { Image, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
+import YoutubeEmbed from "@/src/components/media/YoutubeEmbed";
 import { Card, OutlineButton, PreviewPlaceholder, PrimaryButton } from "@/src/components/ui";
+import { getCachedMediaSizeLabel, resolveMediaUriForOpen, useResolvedMediaUri } from "@/src/lib/cachedMedia";
 import { getPublicContentUrl } from "@/src/lib/catalogApi";
 import { downloadItemMedia, removeItemMedia, type DownloadableMediaType } from "@/src/lib/downloadManager";
+import { openExternalUrl, openMailto } from "@/src/lib/externalLink";
 import { addRecentItem } from "@/src/lib/recentCache";
+import { useWebAudioPlayer } from "@/src/lib/webAudio";
 import { useCatalog } from "@/src/state/catalogContext";
 import { colors } from "@/src/theme/tokens";
 import { parseSafeHtml, type HtmlInlineNode } from "@bizu/shared";
@@ -40,11 +41,16 @@ export default function ItemDetailScreen() {
   const remoteUrl = item?.storage_path ? getPublicContentUrl(item.storage_path) : null;
   const videoLink = item?.type === "video" ? (item.link?.trim() ?? "") : "";
   const youtubeVideoId = useMemo(() => getYouTubeId(videoLink), [videoLink]);
-  const canRenderEmbeddedVideo = Platform.OS !== "web";
-  const imageSourceUri = mediaType === "image" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
-  const audioSource = mediaType === "audio" ? (downloadedEntry?.localUri ?? remoteUrl) : null;
-  const audioPlayer = useAudioPlayer(audioSource ?? null);
-  const audioStatus = useAudioPlayerStatus(audioPlayer);
+  const imageSourceUri = useResolvedMediaUri(
+    mediaType === "image" ? downloadedEntry?.localUri ?? null : null,
+    mediaType === "image" ? remoteUrl : null,
+  );
+  const audioSource = useResolvedMediaUri(
+    mediaType === "audio" ? downloadedEntry?.localUri ?? null : null,
+    mediaType === "audio" ? remoteUrl : null,
+  );
+  const audioPlayer = useWebAudioPlayer(mediaType === "audio" ? audioSource : null, repeatEnabled);
+  const audioStatus = audioPlayer.status;
 
   const audioDuration = Math.max(0, audioStatus.duration ?? 0);
   const audioCurrentTime = Math.max(0, Math.min(audioStatus.currentTime ?? 0, audioDuration || 0));
@@ -71,11 +77,9 @@ export default function ItemDetailScreen() {
       }
 
       try {
-        const info = await FileSystem.getInfoAsync(downloadedEntry.localUri);
-        const bytes = "size" in info && typeof info.size === "number" ? info.size : 0;
-        const mb = bytes / (1024 * 1024);
+        const label = await getCachedMediaSizeLabel(downloadedEntry.localUri);
         if (active) {
-          setOfflineSizeLabel(`${mb.toFixed(1)} MB`);
+          setOfflineSizeLabel(label);
         }
       } catch {
         if (active) setOfflineSizeLabel("-- MB");
@@ -110,13 +114,6 @@ export default function ItemDetailScreen() {
   useEffect(() => {
     setLyricsNeedsToggle(isLyricsLongByLength);
   }, [isLyricsLongByLength]);
-
-  useEffect(() => {
-    if (mediaType !== "audio") {
-      return;
-    }
-    audioPlayer.loop = repeatEnabled;
-  }, [audioPlayer, mediaType, repeatEnabled]);
 
   async function handleDownload() {
     if (!item || !item.storage_path || !mediaType) {
@@ -162,38 +159,33 @@ export default function ItemDetailScreen() {
     setBusy(true);
     setMessage(null);
     try {
+      if (mediaType === "pdf") {
+        const pendingWindow = openPdfPendingWindow();
+        const preferredPdfUrl = downloadedEntry?.localUri
+          ? await resolveMediaUriForOpen(downloadedEntry.localUri, remoteUrl)
+          : remoteUrl;
+
+        if (!preferredPdfUrl) {
+          closeWindowSafely(pendingWindow);
+          throw new Error("URL de PDF indisponível.");
+        }
+
+        openPdf(preferredPdfUrl, pendingWindow);
+        return;
+      }
+
       if (downloadedEntry?.localUri) {
-        const info = await FileSystem.getInfoAsync(downloadedEntry.localUri);
-        if (info.exists) {
-          if (mediaType === "pdf") {
-            router.push({
-              pathname: "/pdf",
-              params: {
-                uri: downloadedEntry.localUri,
-                title: item.title,
-              },
-            });
-            return;
-          }
-          await Linking.openURL(downloadedEntry.localUri);
+        const cachedUri = await resolveMediaUriForOpen(downloadedEntry.localUri, remoteUrl);
+        if (cachedUri) {
+          openExternalUrl(cachedUri);
           return;
         }
+
         await removeItemMedia(item.id);
         await reloadDownloads();
       }
 
-      if (mediaType === "pdf") {
-        router.push({
-          pathname: "/pdf",
-          params: {
-            uri: remoteUrl,
-            title: item.title,
-          },
-        });
-        return;
-      }
-
-      await Linking.openURL(remoteUrl);
+      openExternalUrl(remoteUrl);
     } catch (error) {
       setMessage(toMessage(error, "Falha ao abrir item."));
     } finally {
@@ -205,16 +197,10 @@ export default function ItemDetailScreen() {
     if (!remoteUrl || !item || (item.type !== "pdf" && item.type !== "image")) return;
     try {
       if (item.type === "pdf") {
-        router.push({
-          pathname: "/pdf",
-          params: {
-            uri: remoteUrl,
-            title: item.title,
-          },
-        });
+        openPdf(remoteUrl);
         return;
       }
-      await Linking.openURL(remoteUrl);
+      openExternalUrl(remoteUrl);
     } catch (error) {
       setMessage(toMessage(error, "Falha ao abrir URL remota."));
     }
@@ -225,14 +211,14 @@ export default function ItemDetailScreen() {
       return;
     }
     try {
-      await Linking.openURL(videoLink);
+      openExternalUrl(videoLink);
     } catch (error) {
       setMessage(toMessage(error, "Falha ao abrir link do YouTube."));
     }
   }
 
   async function handleAudioPlayPause() {
-    if (!item || mediaType !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !audioSource) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -249,7 +235,7 @@ export default function ItemDetailScreen() {
         await audioPlayer.seekTo(0);
       }
 
-      audioPlayer.play();
+      await audioPlayer.play();
     } catch (error) {
       setMessage(toMessage(error, "Falha ao reproduzir áudio."));
     } finally {
@@ -258,7 +244,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioForwardFiveSeconds() {
-    if (!item || mediaType !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !audioSource) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -274,7 +260,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioBackwardFiveSeconds() {
-    if (!item || mediaType !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !audioSource) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -290,7 +276,7 @@ export default function ItemDetailScreen() {
   }
 
   async function handleAudioRestart() {
-    if (!item || mediaType !== "audio" || !remoteUrl) return;
+    if (!item || mediaType !== "audio" || !audioSource) return;
 
     setAudioBusy(true);
     setMessage(null);
@@ -310,26 +296,9 @@ export default function ItemDetailScreen() {
     }
 
     if (!lyricsNoticeShown) {
-      if (Platform.OS === "web") {
-        setLyricsNoticeShown(true);
-        setMessage(LYRICS_NOTICE_MESSAGE);
-        setLyricsExpanded(true);
-        return;
-      }
-
-      Alert.alert("Aviso", LYRICS_NOTICE_MESSAGE, [
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-        {
-          text: "Continuar",
-          onPress: () => {
-            setLyricsNoticeShown(true);
-            setLyricsExpanded(true);
-          },
-        },
-      ]);
+      setLyricsNoticeShown(true);
+      setMessage(LYRICS_NOTICE_MESSAGE);
+      setLyricsExpanded(true);
       return;
     }
 
@@ -362,7 +331,7 @@ export default function ItemDetailScreen() {
         // fallback to mailto below
       }
 
-      await Linking.openURL(`mailto:?subject=${mailSubject}&body=${mailBody}`);
+      openMailto(`mailto:?subject=${mailSubject}&body=${mailBody}`);
     } catch (error) {
       setMessage(toMessage(error, "Falha ao abrir fluxo de reporte."));
     } finally {
@@ -381,7 +350,7 @@ export default function ItemDetailScreen() {
   }
 
   async function commitScrubAt(locationX: number) {
-    if (!item || mediaType !== "audio" || !remoteUrl) {
+    if (!item || mediaType !== "audio" || !audioSource) {
       return;
     }
 
@@ -427,7 +396,7 @@ export default function ItemDetailScreen() {
           setScrubTime(null);
         },
       }),
-    [audioDuration, progressTrackWidth, mediaType, item?.id, remoteUrl, audioPlayer],
+    [audioDuration, progressTrackWidth, mediaType, item?.id, audioSource, audioPlayer],
   );
 
   async function handleToggleFavorite() {
@@ -441,7 +410,8 @@ export default function ItemDetailScreen() {
 
   return (
     <Screen edges={["left", "right"]}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        <WebContent style={styles.container}>
         {loadingCache ? <Text style={styles.metaText}>Carregando cache local...</Text> : null}
 
         {!loadingCache && !item ? (
@@ -467,29 +437,18 @@ export default function ItemDetailScreen() {
 
             {item.type === "video" ? (
               <Card style={styles.videoCard}>
-                {youtubeVideoId && !videoEmbedFailed && canRenderEmbeddedVideo ? (
+                {youtubeVideoId && !videoEmbedFailed ? (
                   <View style={styles.videoEmbedFrame}>
-                    <YoutubePlayer
-                      height={220}
-                      play={false}
+                    <YoutubeEmbed
                       videoId={youtubeVideoId}
-                      webViewStyle={styles.videoEmbed}
-                      webViewProps={{
-                        allowsInlineMediaPlayback: true,
-                      }}
-                      initialPlayerParams={{
-                        rel: false,
-                        controls: true,
-                      }}
+                      style={styles.videoEmbed}
                       onError={() => setVideoEmbedFailed(true)}
                     />
                   </View>
                 ) : (
                   <View style={styles.videoFallback}>
                     <Text style={styles.metaText}>
-                      {canRenderEmbeddedVideo
-                        ? "Não foi possível carregar o vídeo incorporado."
-                        : "Visualização incorporada não é suportada no web. Abra no YouTube."}
+                      Não foi possível carregar o vídeo incorporado.
                     </Text>
                   </View>
                 )}
@@ -505,7 +464,7 @@ export default function ItemDetailScreen() {
 
             {item.type === "pdf" ? (
               <PrimaryButton
-                label="Ler Documento (PDF)"
+                label="Abrir PDF"
                 onPress={() => void handleOpenPreferred()}
                 disabled={busy}
               />
@@ -705,6 +664,7 @@ export default function ItemDetailScreen() {
             ) : null}
           </>
         ) : null}
+        </WebContent>
       </ScrollView>
     </Screen>
   );
@@ -714,8 +674,10 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 16,
+  },
   container: {
-    padding: 16,
     gap: 12,
     backgroundColor: colors.gray100,
   },
@@ -753,7 +715,7 @@ const styles = StyleSheet.create({
   },
   videoEmbedFrame: {
     width: "100%",
-    height: 220,
+    aspectRatio: 16 / 9,
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: colors.gray900,
@@ -781,8 +743,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   transportButton: {
-    minHeight: 44,
-    width: 56,
+    minHeight: 40,
+    width: 52,
     borderRadius: 11,
     borderWidth: 1,
     borderColor: colors.gray300,
@@ -802,8 +764,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   transportPrimaryButton: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -818,8 +780,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.army600,
   },
   transportRepeatButton: {
-    minHeight: 44,
-    width: 56,
+    minHeight: 40,
+    width: 52,
     borderRadius: 11,
     borderWidth: 1,
     borderColor: colors.gray300,
@@ -1001,6 +963,50 @@ const LYRICS_TOGGLE_CHAR_THRESHOLD = 600;
 const LYRICS_NOTICE_MESSAGE =
   'Esta letra é exibida com finalidade informativa e educativa.\nCaso haja qualquer questão relacionada a direitos autorais, utilize a opção "Reportar conteúdo".';
 
+function openPdfPendingWindow(): Window | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.open("about:blank", "_blank", "noopener,noreferrer");
+  } catch {
+    return null;
+  }
+}
+
+function closeWindowSafely(targetWindow: Window | null) {
+  if (!targetWindow) {
+    return;
+  }
+
+  try {
+    targetWindow.close();
+  } catch {
+    // no-op
+  }
+}
+
+function openPdf(url: string, pendingWindow?: Window | null) {
+  if (!url || typeof window === "undefined") {
+    throw new Error("URL de PDF inválida.");
+  }
+
+  if (pendingWindow && !pendingWindow.closed) {
+    try {
+      pendingWindow.location.href = url;
+      return;
+    } catch {
+      // fallback below
+    }
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.location.href = url;
+  }
+}
+
 function toMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
     return `${fallback} ${error.message}`;
@@ -1106,7 +1112,11 @@ function renderHtmlInline(nodes: HtmlInlineNode[]) {
           style={style}
           onPress={() => {
             if (node.href) {
-              void Linking.openURL(node.href);
+              try {
+                openExternalUrl(node.href);
+              } catch {
+                // no-op: link error is surfaced elsewhere when relevant
+              }
             }
           }}
         >

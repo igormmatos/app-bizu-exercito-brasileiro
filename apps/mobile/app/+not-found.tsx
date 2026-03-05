@@ -1,17 +1,20 @@
 import { Link, Stack } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import { Screen, WebContent } from "@/src/components/layout";
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Não encontrado" }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>Esta tela não existe.</Text>
+      <Screen edges={["left", "right"]} backgroundColor="#fff">
+        <WebContent padded={false} style={styles.container}>
+          <Text style={styles.title}>Esta tela não existe.</Text>
 
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Voltar para Home</Text>
-        </Link>
-      </View>
+          <Link href="/" style={styles.link}>
+            <Text style={styles.linkText}>Voltar para Home</Text>
+          </Link>
+        </WebContent>
+      </Screen>
     </>
   );
 }

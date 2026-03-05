@@ -1,4 +1,3 @@
-import * as FileSystem from "expo-file-system/legacy";
 import { getPublicContentUrl } from "./catalogApi";
 import {
   clearDownloads,
@@ -7,37 +6,33 @@ import {
   setDownloaded,
   type DownloadedEntry,
 } from "./downloadCache";
+import { clearDownloadsCache, createVirtualDownloadUri, deleteDownloadResponse, putDownloadResponse } from "./downloadStorage";
 
 export type DownloadableMediaType = "pdf" | "audio" | "image";
-
-const DOWNLOADS_ROOT = `${FileSystem.documentDirectory ?? ""}downloads/`;
 
 export async function downloadItemMedia(
   itemId: string,
   storagePath: string,
   type: DownloadableMediaType,
 ): Promise<{ localUri: string }> {
-  await ensureDir(DOWNLOADS_ROOT);
-
-  const typeDir = `${DOWNLOADS_ROOT}${type}/`;
-  await ensureDir(typeDir);
-
   const extension = resolveExtension(storagePath, type);
-  const localUri = `${typeDir}${itemId}.${extension}`;
+  const localUri = createVirtualDownloadUri(itemId, extension);
   const remoteUrl = getPublicContentUrl(storagePath);
 
-  const result = await FileSystem.downloadAsync(remoteUrl, localUri);
-  if (!result?.uri) {
-    throw new Error("Download failed: no local file URI returned.");
+  const response = await fetch(remoteUrl);
+  if (!response.ok) {
+    throw new Error(`Falha no download remoto (${response.status}).`);
   }
 
+  await putDownloadResponse(localUri, response.clone());
+
   await setDownloaded(itemId, {
-    localUri: result.uri,
+    localUri,
     storagePath,
     downloadedAt: new Date().toISOString(),
   });
 
-  return { localUri: result.uri };
+  return { localUri };
 }
 
 export async function removeItemMedia(itemId: string): Promise<void> {
@@ -45,7 +40,7 @@ export async function removeItemMedia(itemId: string): Promise<void> {
   const entry = map[itemId];
 
   if (entry?.localUri) {
-    await FileSystem.deleteAsync(entry.localUri, { idempotent: true });
+    await deleteDownloadResponse(entry.localUri);
   }
 
   await removeDownloaded(itemId);
@@ -62,12 +57,8 @@ export async function getDownloadedEntry(itemId: string): Promise<DownloadedEntr
 }
 
 export async function clearAllDownloadsMedia(): Promise<void> {
-  await FileSystem.deleteAsync(DOWNLOADS_ROOT, { idempotent: true });
+  await clearDownloadsCache();
   await clearDownloads();
-}
-
-async function ensureDir(path: string): Promise<void> {
-  await FileSystem.makeDirectoryAsync(path, { intermediates: true });
 }
 
 function resolveExtension(storagePath: string, type: DownloadableMediaType): string {
